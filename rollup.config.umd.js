@@ -8,6 +8,6 @@ export default {
     moduleName: 'stopLang',
     plugins: [
         babel(),
-        //uglify()
+        uglify()
     ]
 };
