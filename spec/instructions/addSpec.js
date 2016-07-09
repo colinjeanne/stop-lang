@@ -5,73 +5,78 @@ describe('The ADD instruction', () => {
         const program = new stopLang([`ADD ${dataString}`]);
         return program.execute();
     };
-    
+
     it('cannot be empty', () => {
         expect(() => getResult('')).toThrowError(SyntaxError);
     });
-    
+
     it('cannot have only one argument', () => {
         expect(() => getResult('1')).toThrowError(SyntaxError);
     });
-    
+
     it('can add two items', () => {
         expect(getResult('1 1')).toBe(2);
     });
-    
+
     it('cannot take double references', () => {
         expect(() => getResult('$$0 1')).toThrowError(SyntaxError);
     });
-    
+
     it('can add more than two items', () => {
         expect(getResult('1 1 1')).toBe(3);
     });
-    
+
     it('can add items in a list', () => {
         expect(getResult('[2, 1]')).toBe(3);
     });
-    
+
     it('can add items to a list', () => {
         expect(getResult('[2, 1] 3')).toEqual([2, 1, 3]);
     });
-    
+
     it('can concatenate lists', () => {
         expect(getResult('[2, 1] [3, 4]')).toEqual([2, 1, 3, 4]);
     });
-    
-    it('can concatenate string', () => {
-        expect(getResult('"foo" "bar"')).toBe("foobar");
+
+    it('can element-wise add to lists', () => {
+        expect(getResult('3 [3, 4]')).toEqual([6, 7]);
+        expect(getResult('"foo" [3, 4]')).toEqual(['foo3', 'foo4']);
+        expect(getResult('UNDEFINED [3, 4]')).toEqual([undefined, undefined]);
     });
-    
-    it('can add any type to any type', () => {
-        const instructions = [
-            'NOOP ; Create undefined',
-            'NOOP "foo" ; Create string',
-            'NOOP 3 ; Create number',
-            'NOOP 1 2 ; Create list',
-            'ADD $0 $1 ; undefined + string',
-            'ADD $0 $2 ; undefined + number',
-            'ADD $0 $3 ; undefined + list',
-            'ADD $1 $0 ; string + undefined',
-            'ADD $1 $2 ; string + number',
-            'ADD $1 $3 ; string + list',
-            'ADD $2 $0 ; number + undefined',
-            'ADD $2 $1 ; number + string',
-            'ADD $2 $3 ; number + list',
-            'NOOP $4 $5 $6 $7 $8 $9 $10 $11 $12'
-        ];
-        
-        const program = new stopLang(instructions);
-        
-        expect(program.execute()).toEqual([
-            'undefinedfoo',
-            NaN,
-            'undefined1,2',
-            'fooundefined',
-            'foo3',
-            'foo1,2',
-            NaN,
-            '3foo',
-            '31,2'
-        ]);
+
+    it('can concatenate string', () => {
+        expect(getResult('"foo" "bar"')).toBe('foobar');
+    });
+
+    it('can concatenate strings and numbers', () => {
+        expect(getResult('"foo" 3')).toBe('foo3');
+        expect(getResult('3 "foo"')).toBe('3foo');
+    });
+
+    it('can add infinities', () => {
+        expect(getResult('INFINITY INFINITY')).toBe(Infinity);
+        expect(getResult('INFINITY -INFINITY')).toEqual(NaN);
+        expect(getResult('-INFINITY INFINITY')).toEqual(NaN);
+        expect(getResult('INFINITY 3')).toBe(Infinity);
+        expect(getResult('3 INFINITY')).toBe(Infinity);
+        expect(getResult('-INFINITY 3')).toBe(-Infinity);
+        expect(getResult('3 -INFINITY')).toBe(-Infinity);
+        expect(getResult('INFINITY NAN')).toEqual(NaN);
+        expect(getResult('NAN INFINITY')).toEqual(NaN);
+    });
+
+    it('can add NaNs', () => {
+        expect(getResult('NAN NAN')).toEqual(NaN);
+        expect(getResult('NAN 3')).toEqual(NaN);
+        expect(getResult('3 NAN')).toEqual(NaN);
+    });
+
+    it('can add undefined to any type', () => {
+        expect(getResult('UNDEFINED UNDEFINED')).not.toBeDefined();
+        expect(getResult('UNDEFINED "foo"')).not.toBeDefined();
+        expect(getResult('UNDEFINED 3')).not.toBeDefined();
+        expect(getResult('"foo" UNDEFINED')).not.toBeDefined();
+        expect(getResult('3 UNDEFINED')).not.toBeDefined();
+        expect(getResult('[1, 2] UNDEFINED')).toEqual([1, 2, undefined]);
     });
 });

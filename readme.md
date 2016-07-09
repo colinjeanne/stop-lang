@@ -27,30 +27,31 @@ may make some feel uneasy, rest assured that the deque-based model that STOP is
 built on guarantees that commands are added in well-defined and expected
 locations.
 
-Each command has three parts: a name, a set of arguments, and a comment. These
-parts are delimited by whitespace and, in order to avoid debate on which type
-of whitespace<sup>[8]</sup> is best, the only valid whitespace character is the
-space character. Any amount of whitespace is possible before a command, after a
-command, or between the various parts of a command.
+Each command has four parts: an optional label, a name, a set of arguments, and
+an optional comment. These parts are delimited by whitespace and, in order to
+avoid debate on which type of whitespace<sup>[8]</sup> is best, the only valid
+whitespace character is the space character. Any amount of whitespace is
+possible before a command, after a command, or between the various parts of a
+command.
 
 The canonical form of a command is
 
-    NAME [data1 data2 data3...] [; Comment]
+    (LABEL) NAME [data1 data2 data3...] [; Comment]
+
+Labels and command names must appear in all caps.
 
 ## Types
 
 STOP has only a few types:
 
-### Undefined
-An undefined value. This type cannot be created directly but can appear in
-contexts where a value must be present but not value exists. This type removes
-many edge cases that would have otherwise existed for developers.
+### `UNDEFINED`
+An undefined value.
 
 ### Number
 A numeric type. Numbers follow<sup>[9]</sup> the IEEE-754 standard. A common
 number format for all numbers greatly simplifies arithmetic logic. There is no
 need to worry about signed/unsigned mismatch<sup>[10]</sup> or integer to
-floating point conversion. In STOP, numbers are almost always finite!
+floating point conversion.
 
 Numbers follow the patterns that a rational person would expect. Here are some
 example numbers:
@@ -62,6 +63,13 @@ example numbers:
 * `300e-2`
 * `0.004E3`
 * `-1519940.54418e+01`
+
+STOP additionally supports the following special numbers:
+
+* `INFINITY`
+* `+INFINITY`
+* `-INFINITY`
+* `NAN`
 
 ### String
 Strings in STOP are far simpler<sup>[11]</sup> than in other languages. Strings
@@ -180,7 +188,8 @@ An explicit Boolean data type is unnecessary in STOP because of the existence
 of truthiness. A value is truthy if it is non-empty. If it is empty then it is
 falsey. The falsey values are
 
-* `undefined`
+* `UNDEFINED`
+* `NAN`
 * `0`
 * `""`
 * `[]`
@@ -188,7 +197,8 @@ falsey. The falsey values are
 ### Equality
 Two STOP values are equal if they have the same type and the same value. Two
 lists are equal if they have the same length and if each element of one is
-equal to the corresponding element of the other.
+equal to the corresponding element of the other. `NAN` is unequal to
+everything, including itself.
 
 ## Commands
 
@@ -197,30 +207,29 @@ The `ADD` command requires at least two values and will add them together with
 addition being defined depending on the types of the values. Values are added
 left to right.
 
-If value1 is a list then the subsequent values are appended to the list unless
-one of those values is itself a list in which case the right list is
-concatenated to the left list.
+If `value1` and `value2` are both lists then `value2` is concatenated to
+`value1`. Otherwise, if `value2` ia not a list then it is appended to `value1`.
 
-When adding strings to strings the strings are concatenated. When adding
-strings to any other type, the other type is interpreted as a string.
+If `value2` is a list then `value1` is added to each element of `value2`.
+Otherwise, if either `value1` or `value2` is `UNDEFINED` then the result is
+`UNDEFINED`.
 
-When adding numbers to numbers the numbers are added arithemtically.
-
-The result of all other data type combinations is not a number.
+If both values are numbers they are added numerically. Otherwise the values are
+coverted to strings and concatenated.
 
     ADD 1 1 ; Returns 2
 
 ### ALTER string number
 The `ALTER` command moves the first label with the given name in the list of
-commands to the specified index. The command takes a string for the label's
-name and an integer representing the index at which the label will be inserted.
-The label is inserted before other commands at that location.
+commands to the specified command index. The command takes a string for the
+label's name and an integer representing the index to which the label will be
+moved.
 
 The index is interpreted MOD the number of commands.
 
-This command returns `undefined`.
+This command returns `UNDEFINED`.
 
-    ALTER "test" 1 ; Moves the label "test" to be the second command
+    ALTER "TEST" 1 ; Moves the label "TEST" to be the second command
 
 ### AND [value1 value2...]
 The `AND` command requires will AND values together with AND being defined
@@ -247,7 +256,11 @@ The `DIV` command requires at least two values and will divide with division
 being defined depending on the types of the values. Values are divided left to
 right.
 
-When dividing numbers from numbers the numbers are divided arithemtically.
+If any value is `UNDEFINED` then the result is undefined.
+
+If any value is not a number then the result is `NAN`.
+
+Otherwise the values are divided arithemtically.
 
 The result of all other data type combinations is not a number.
 
@@ -280,7 +293,7 @@ does not move the instruction pointer.
 
 This command returns `undefined`.
 
-    GOTO "test" ; Jumps to the label "test"
+    GOTO "TEST" ; Jumps to the label "TEST"
 
 ### INJECT string [value1 value2...]
 The `INJECT` command takes a command name and a set of values to use as the
@@ -289,23 +302,15 @@ the set of commands.
 
 Indirect references in the set of values decay into direct references.
 
-    INJECT "GOTO" "test" ; Inserts the command GOTO "test" as the last command
+    INJECT "GOTO" "TEST" ; Inserts the command GOTO "TEST" as the last command
 
 ### ITEM list|string number
 The `ITEM` command takes a single list or string and an nonnegative number
 representing an index and returns the value at that index.
 
-If the index is out of range then `undefined` is returned.
+If the index is out of range then `UNDEFINED` is returned.
 
     ITEM [1, 2, 3] 2 ; Returns 3
-
-### LABEL string
-The `LABEL` command defines a label. This command takes a single string
-representing the name of the label and returns `undefined`.
-
-Multiple labels can have the same name.
-
-    LABEL "test" ; Defines the label "test"
 
 ### LENGTH list|string
 The `LENGTH` command takes a single list or string and returns the number of
@@ -317,7 +322,11 @@ elements in that list or string.
 The `LESS` command requires at least two values and returns 1 if each argument
 is less than all arguments to its right and 0 otherwise.
 
-Numbers are compared numerically.
+If all values are numbers then they are compared numerically.
+
+If all values are strings then they are compared alphabetically.
+
+Otherwise the result is 0.
 
 Strings are compared alphabetically.
 
@@ -328,8 +337,11 @@ The `MOD` command requires at least two values and will mod them with modulus
 being defined depending on the types of the values. Values are modded left to
 right.
 
-When modding numbers from numbers the numbers the result is the remainder of a
-division.
+If any value is `UNDEFINED` then the result is undefined.
+
+If any value is not a number then the result is `NAN`.
+
+Otherwise the values are modded arithemtically.
 
 The result of all other data type combinations is not a number.
 
@@ -340,13 +352,18 @@ The `MUL` command requires at least two values and will multiple them together
 with multiplication being defined depending on the types of the values. Values
 are multiplied left to right.
 
+If any value is `UNDEFINED` then the result is undefined.
+
+If the right value is a nonnegative integer and the left value is a string or
+list then the left value is repeated according to the right value.
+
 If the left value is a list or a string and the right value is a nonnegative
 integer then the list or string is concatenated with itself the specified
 number of times.
 
-When multiplying numbers to numbers the numbers are multiplied arithemtically.
+If all values are numbers then they are multiplied arithemtically.
 
-The result of all other data type combinations is not a number.
+Otherwise, if any value is not a number then the result is `NAN`.
 
     MUL 4 5 ; Returns 20
 
@@ -358,7 +375,7 @@ arguments are equal to any of its other arguments and 1 otherwise.
 
 ### NOOP [value1 value2...]
 The `NOOP` command returns its arguments. If no arguments are provided then the
-command returns `undefined`. If a single argument is provided then it is
+command returns `UNDEFINED`. If a single argument is provided then it is
 returned unchanged. If more than one argument is provided then they are
 returned as a list.
 
@@ -428,13 +445,15 @@ The `SUB` command requires at least two values and will subtract them from one
 another with subtraction being defined depending on the types of the values.
 Values are subtracted left to right.
 
-If left value is a list or a string and the right value is a number then the
-item or character at that index is removed.
+If any value is `UNDEFINED` then the result is undefined.
 
-When subtracting numbers from numbers the numbers are subtracted
-arithemtically.
+If the right value is a list of nonnegative integers and the left value is a
+string or list then the right value is interpreted as a set of indices to
+remove from the left value.
 
-The result of all other data type combinations is not a number.
+If all values are numbers then they are multiplied arithemtically.
+
+Otherwise, if any value is not a number then the result is `NAN`.
 
     SUB 1 2 ; Returns -1
 

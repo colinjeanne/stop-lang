@@ -3,6 +3,8 @@
  * @module ./parsing
  */
 
+import Reference from './types/reference';
+
 /**
  * The result of a type extraction
  * @typedef {Object} ExtractionResult
@@ -11,26 +13,49 @@
  */
 
 /**
+ * Extracts undefined from the instruction data string
+ * @param {string} instruction The complete instruction
+ * @param {string} s The substring from which to extract undefined
+ * @returns {ExtractionResult}
+ */
+const extractUndefined = (instruction, s) => {
+    if (!s.startsWith('UNDEFINED')) {
+        throw new SyntaxError(`Unexpected term in ${instruction}`);
+    }
+
+    return {endIndex: 'UNDEFINED'.length};
+};
+
+/**
  * Extracts a number from the instruction data string
  * @param {string} instruction The complete instruction
  * @param {string} s The substring from which to extract the number
  * @returns {ExtractionResult}
  */
 const extractNumber = (instruction, s) => {
-    const decimal = '(\\-|\\+)?((\\d+)(\\.\\d+)?|(\\d*)\\.\\d+)';
-    const fullNumber = `^${decimal}((e|E)(\\-|\\+)?(\\d+))?`
-    
-    const matches = (new RegExp(fullNumber)).exec(s);
-    if (!matches) {
-        throw new SyntaxError(`Unexpected term in ${instruction}`);
+    const decimal = '(-|\\+)?((\\d+)(\\.\\d+)?|(\\d*)\\.\\d+)';
+    const fullNumber = `^${decimal}((e|E)(-|\\+)?(\\d+))?`;
+
+    const numberMatches = (new RegExp(fullNumber)).exec(s);
+    if (numberMatches) {
+        const value = parseFloat(s);
+        return {endIndex: numberMatches[0].length, value};
     }
-    
-    const value = parseFloat(s);
-    if (isNaN(value) || !isFinite(value)) {
-        throw new SyntaxError(`Invalid number in ${instruction}`);
+
+    const infinityRegex = /^(-|\+)?INFINITY( |$)/;
+    const infinityMatches = infinityRegex.exec(s);
+    if (infinityMatches) {
+        const value = infinityMatches[1] === '-' ? -Infinity : Infinity;
+        return {endIndex: infinityMatches[0].length, value};
     }
-    
-    return {endIndex: matches[0].length, value};
+
+    const nanRegex = /^NAN( |$)/;
+    const nanMatches = nanRegex.exec(s);
+    if (nanMatches) {
+        return {endIndex: 'NAN'.length, value: NaN};
+    }
+
+    throw new SyntaxError(`Unexpected term in ${instruction}`);
 };
 
 /**
@@ -61,11 +86,11 @@ const extractString = (instruction, s) => {
             value += c;
         }
     }
-    
+
     if (i === s.length) {
         throw new SyntaxError(`Unexpected end of instruction ${instruction}`);
     }
-    
+
     return {endIndex: i + 1, value};
 };
 
@@ -89,15 +114,15 @@ const extractList = (instruction, s) => {
             if (!elementHasValue) {
                 throw new SyntaxError(`Unexpected comma ${instruction}`);
             }
-            
+
             elementHasValue = false;
         } else if (c === ' ') {
-            continue
+            continue;
         } else {
             if (elementHasValue) {
                 throw new SyntaxError(`Unexpected term ${instruction}`);
             }
-            
+
             ({endIndex, value: itemValue} =
                 extractItem(instruction, s.substr(i)));
             value.push(itemValue);
@@ -105,15 +130,15 @@ const extractList = (instruction, s) => {
             elementHasValue = true;
         }
     }
-    
+
     if (!elementHasValue && (value.length > 0)) {
         throw new SyntaxError(`Unexpected end of list ${instruction}`);
     }
-    
+
     if (i === s.length) {
         throw new SyntaxError(`Unexpected end of instruction ${instruction}`);
     }
-    
+
     return {endIndex: i + 1, value};
 };
 
@@ -123,72 +148,6 @@ const extractList = (instruction, s) => {
  * @property {string} name The name of the instruction
  * @property {*[]} data An array of extracted values
  */
-
-/**
- * A reference
- */
-class Reference {
-    /**
-     * Creates a reference
-     * @param {number} ref The referenced instruction index
-     * @param {boolean} isIndirect Whether the reference is indirect
-     * @param {boolean} isRelative Whether the reference is relative to the
-     * instruction pointer
-     */
-    constructor(ref, isIndirect, isRelative) {
-        this.ref = ref;
-        this.isIndirect = isIndirect;
-        this.isRelative = isRelative;
-    }
-    
-    /**
-     * Returns a direct reference from an indirect reference
-     */
-    decay() {
-        if (!this.isIndirect) {
-            throw new Error('Cannot decay a direct reference');
-        }
-        
-        return new Reference(this.ref, false, this.isRelative);
-    }
-    
-    /**
-     * Retrieves the referenced instruction's index
-     * @param {number} ip The current instruction pointer
-     * @param {ParsedInstruction[]} instructions The list of instructions
-     */
-    instruction(ip, instructions) {
-        // If the reference is negative then modding by the length will result
-        // in a number between 0 and -instructions.length. Adding
-        // instructions.length will return the value to the correct positive
-        // range and behave as if the reference was counting from the end
-        // rather than from the start.
-        const base = this.isRelative ? ip : 0;
-        const modded = (this.ref + base) % instructions.length;
-        return modded < 0 ? modded + instructions.length : modded;
-    }
-    
-    /**
-     * Converts the reference to a string
-     */
-    toString() {
-        let s = '$';
-        if (this.isIndirect) {
-            s += '$';
-        }
-        
-        if (this.isRelative) {
-            s += 'ip';
-            if (this.ref !== 0) {
-                s += this.ref.toString();
-            }
-        } else {
-            s += this.ref.toString();
-        }
-        
-        return s;
-    }
-}
 
 /**
  * Extracts a reference from the instruction data string
@@ -202,26 +161,26 @@ const extractReference = (instruction, s) => {
         throw new SyntaxError(
             `Invalid reference in instruction ${instruction}`);
     }
-    
+
     const isIndirect = matches[2] === '$$';
     const isRelative = matches[3] === undefined;
-    
+
     let refString = '0';
     if (isRelative && matches[4] !== undefined) {
         refString = matches[4];
     } else if (!isRelative) {
         refString = matches[3];
     }
-    
+
     const ref = parseInt(refString, 10);
     if (isNaN(ref) || !isFinite(ref)) {
         throw new SyntaxError(
             `Invalid reference line in instruction ${instruction}`);
     }
-    
+
     const value = new Reference(ref, isIndirect, isRelative);
     const endIndex = matches[1].length;
-    
+
     return {endIndex, value};
 };
 
@@ -234,40 +193,44 @@ const extractReference = (instruction, s) => {
 const extractItem = (instruction, s) => {
     let endIndex = s.length;
     let value = undefined;
-    
+
     // Remove leading spaces
     let firstNonspaceIndex = s.search('[^ ]');
     if (firstNonspaceIndex !== -1) {
         const trimmed = s.substr(firstNonspaceIndex);
         switch (s[firstNonspaceIndex]) {
-            case '"':
-                ({endIndex, value} = extractString(instruction, trimmed));
-                break;
-            
-            case '[':
-                ({endIndex, value} = extractList(instruction, trimmed));
-                break;
-            
-            case '$':
-                ({endIndex, value} = extractReference(instruction, trimmed));
-                break;
-            
-            case ';':
-                throw new SyntaxError(`Unexpected comment in ${instruction}`);
-                
-            default:
-                ({endIndex, value} = extractNumber(instruction, trimmed));
-                break;
+        case '"':
+            ({endIndex, value} = extractString(instruction, trimmed));
+            break;
+
+        case '[':
+            ({endIndex, value} = extractList(instruction, trimmed));
+            break;
+
+        case '$':
+            ({endIndex, value} = extractReference(instruction, trimmed));
+            break;
+
+        case 'U':
+            ({endIndex, value} = extractUndefined(instruction, trimmed));
+            break;
+
+        case ';':
+            throw new SyntaxError(`Unexpected comment in ${instruction}`);
+
+        default:
+            ({endIndex, value} = extractNumber(instruction, trimmed));
+            break;
         }
-        
+
         // Remove trailing spaces
         if ((endIndex !== -1) && (s[endIndex] == ' ')) {
             endIndex += s.substr(endIndex).search('[^ ]');
         }
-        
+
         endIndex += firstNonspaceIndex;
     }
-    
+
     return {endIndex, value};
 };
 
@@ -292,7 +255,7 @@ const parseDataAndComment = (instruction, dataAndComment) => {
             i += endIndex - 1;
         }
     }
-    
+
     return data;
 };
 
@@ -304,19 +267,20 @@ const parseDataAndComment = (instruction, dataAndComment) => {
  */
 export default instruction => {
     let data = [];
-    
-    const matches = /^ *([A-Z-]+)(?: +(.*))? *$/.exec(instruction);
+
+    const matches = /^ *(?:\(([A-Z-]+)\) +)?([A-Z-]+)(?: +(.*))? *$/.exec(instruction);
     if (!matches) {
         throw new SyntaxError(`Invalid instruction ${instruction}`);
     }
-    
-    const name = matches[1];
-    if (matches[2]) {
-        data = parseDataAndComment(instruction, matches[2]);
+
+    const label = matches[1];
+    const name = matches[2];
+    if (matches[3]) {
+        data = parseDataAndComment(instruction, matches[3]);
     }
-    
-    const parsed = { name, data };
+
+    const parsed = { name, data, label };
     parsed.toString = () => instruction;
-    
+
     return parsed;
 };

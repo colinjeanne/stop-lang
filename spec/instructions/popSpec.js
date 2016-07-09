@@ -5,7 +5,7 @@ describe('The POP instruction', () => {
         const program = new stopLang([`POP ${dataString}`]);
         return program.execute();
     };
-    
+
     it('can be empty', () => {
         const instructions = [
             'NOOP 1',
@@ -13,11 +13,11 @@ describe('The POP instruction', () => {
             'POP',
             'NOOP $0'
         ];
-        
+
         const program = new stopLang(instructions);
         expect(program.execute()).toBe(2);
     });
-    
+
     it('must be empty', () => {
         expect(() => getResult('1')).toThrowError(SyntaxError);
     });

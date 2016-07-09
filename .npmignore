@@ -1,3 +1,5 @@
+.eslintignore
+.eslintrc.json
 .gitignore
 rollup.config.umd.js
 spec

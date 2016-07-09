@@ -5,49 +5,70 @@ describe('The SUB instruction', () => {
         const program = new stopLang([`SUB ${dataString}`]);
         return program.execute();
     };
-    
+
     it('cannot be empty', () => {
         expect(() => getResult('')).toThrowError(SyntaxError);
     });
-    
+
     it('cannot have only one argument', () => {
         expect(() => getResult('1')).toThrowError(SyntaxError);
     });
-    
+
     it('can subtract two items', () => {
         expect(getResult('3 2')).toBe(1);
     });
-    
+
     it('cannot take double references', () => {
         expect(() => getResult('$$0 1')).toThrowError(SyntaxError);
     });
-    
+
     it('can subtract more than two items', () => {
         expect(getResult('1 1 1')).toBe(-1);
     });
-    
+
     it('can subtract items in a list', () => {
         expect(getResult('[2, 1]')).toBe(1);
     });
-    
+
     it('can remove items from a list', () => {
         expect(getResult('[2, 1] 0')).toEqual([1]);
         expect(getResult('[2, 1] 2')).toEqual([2, 1]);
         expect(getResult('[2, 1, 4, 5] 0 2')).toEqual([1, 5]);
+        expect(getResult('[2, 1, 4, 5] [0, 2]')).toEqual([1, 5]);
     });
-    
+
     it('can remove characters from a string', () => {
-        expect(getResult('"foo" 0')).toEqual("oo");
-        expect(getResult('"foo" 3')).toEqual("foo");
-        expect(getResult('"foobar" 0 2')).toEqual("obar");
+        expect(getResult('"foo" 0')).toEqual('oo');
+        expect(getResult('"foo" 3')).toEqual('foo');
+        expect(getResult('"foobar" 0 2')).toEqual('obar');
+        expect(getResult('"foobar" [0, 2]')).toEqual('obar');
     });
-    
+
+    it('can subtract infinities', () => {
+        expect(getResult('INFINITY INFINITY')).toEqual(NaN);
+        expect(getResult('INFINITY -INFINITY')).toBe(Infinity);
+        expect(getResult('-INFINITY INFINITY')).toBe(-Infinity);
+        expect(getResult('INFINITY 3')).toBe(Infinity);
+        expect(getResult('3 INFINITY')).toBe(-Infinity);
+        expect(getResult('-INFINITY 3')).toBe(-Infinity);
+        expect(getResult('3 -INFINITY')).toBe(Infinity);
+        expect(getResult('INFINITY NAN')).toEqual(NaN);
+        expect(getResult('NAN INFINITY')).toEqual(NaN);
+    });
+
+    it('can subtract NaNs', () => {
+        expect(getResult('NAN NAN')).toEqual(NaN);
+        expect(getResult('NAN 3')).toEqual(NaN);
+        expect(getResult('3 NAN')).toEqual(NaN);
+    });
+
     it('can subtract any type to any type', () => {
         const instructions = [
             'NOOP ; Create undefined',
             'NOOP "foo" ; Create string',
             'NOOP 3 ; Create number',
-            'NOOP 1 2 ; Create list',
+            'NOOP "a" "b" ; Create list',
+            'SUB $0 $0 ; undefined - undefined',
             'SUB $0 $1 ; undefined - string',
             'SUB $0 $2 ; undefined - number',
             'SUB $0 $3 ; undefined - list',
@@ -60,22 +81,23 @@ describe('The SUB instruction', () => {
             'SUB $3 $0 ; list - undefined',
             'SUB $3 $1 ; list - string',
             'SUB $3 $3 ; list - list',
-            'NOOP $4 $5 $6 $7 $8 $9 $10 $11 $12 $13 $14 $15'
+            'NOOP $4 $5 $6 $7 $8 $9 $10 $11 $12 $13 $14 $15 $16'
         ];
-        
+
         const program = new stopLang(instructions);
-        
+
         expect(program.execute()).toEqual([
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
             NaN,
             NaN,
+            undefined,
             NaN,
             NaN,
-            NaN,
-            NaN,
-            NaN,
-            NaN,
-            NaN,
-            NaN,
+            undefined,
             NaN,
             NaN
         ]);
