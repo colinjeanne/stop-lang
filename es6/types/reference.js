@@ -6,6 +6,38 @@
 import { isUndefined } from './undefined';
 
 /**
+ * Finds the first index of a label within the set of instructions
+ * @param {string} label
+ * @param {module:./parsing.ParsedInstruction[]} instructions
+ * @returns {number}
+ */
+const findLabelIndex = (label, instructions) =>
+    instructions.findIndex(instruction =>
+        instruction.label === label);
+
+/**
+ * Returns the base instruction index for a reference
+ * @param {string} base The base of the reference
+ * @param {number} ip The current instruction pointer
+ * @param {ParsedInstruction[]} instructions The list of instructions
+ * @returns {number}
+ */
+const baseInstructionIndex = (base, ip, instructions) => {
+    if (base === '') {
+        return 0;
+    } else if (base === 'ip') {
+        return ip;
+    }
+
+    const labelIndex = findLabelIndex(base, instructions);
+    if (labelIndex === -1) {
+        throw new Error(`Unable to find label ${base}`);
+    }
+
+    return labelIndex;
+};
+
+/**
  * A reference
  */
 export default class Reference {
@@ -16,10 +48,10 @@ export default class Reference {
      * @param {boolean} isRelative Whether the reference is relative to the
      * instruction pointer
      */
-    constructor(ref, isIndirect, isRelative) {
-        this.ref = ref;
+    constructor(base, offset, isIndirect) {
+        this.base = base;
+        this.offset = offset;
         this.isIndirect = isIndirect;
-        this.isRelative = isRelative;
     }
 
     /**
@@ -30,7 +62,7 @@ export default class Reference {
             throw new Error('Cannot decay a direct reference');
         }
 
-        return new Reference(this.ref, false, this.isRelative);
+        return new Reference(this.base, this.offset, false);
     }
 
     /**
@@ -44,8 +76,8 @@ export default class Reference {
         // instructions.length will return the value to the correct positive
         // range and behave as if the reference was counting from the end
         // rather than from the start.
-        const base = this.isRelative ? ip : 0;
-        const modded = (this.ref + base) % instructions.length;
+        const baseIndex = baseInstructionIndex(this.base, ip, instructions);
+        const modded = (baseIndex + this.offset) % instructions.length;
         return modded < 0 ? modded + instructions.length : modded;
     }
 
@@ -58,13 +90,10 @@ export default class Reference {
             s += '$';
         }
 
-        if (this.isRelative) {
-            s += 'ip';
-            if (this.ref !== 0) {
-                s += this.ref.toString();
-            }
-        } else {
-            s += this.ref.toString();
+        s += this.base;
+
+        if (this.offset !== 0) {
+            s += this.offset.toString();
         }
 
         return s;
@@ -76,4 +105,4 @@ export default class Reference {
  * @param {*} value
  * @returns {boolean}
  */
-export const isReference = v => !isUndefined(v) && v.hasOwnProperty('ref');
+export const isReference = v => !isUndefined(v) && v.hasOwnProperty('base');

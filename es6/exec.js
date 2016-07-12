@@ -57,7 +57,7 @@ const applyReference = (ip, instructions, datum, stdin, stdout, stderr) => {
 
     if (isReference(datum)) {
         if (!datum.isIndirect) {
-            if (datum.isRelative && (datum.ref === 0)) {
+            if ((datum.base === 'ip') && (datum.offset === 0)) {
                 ret.data = ip;
             } else {
                 const finalIp = datum.instruction(ip, instructions);
@@ -207,31 +207,31 @@ const findLabelIndex = (label, instructions) =>
 const alter = argumentCount(2, 2)((ip, instructions, data) => {
     const instruction = instructions[ip];
 
-    if (!isString(data[0]) || !isInteger(data[1])) {
+    if ((!isString(data[0]) && !isUndefined(data[0])) || !isInteger(data[1])) {
         throw new SyntaxError(
-            `ALTER must take a string and an integer ${instruction}`);
+            `ALTER must take a string or UNDEFINED and an integer ${instruction}`);
     }
 
     const labelIp = findLabelIndex(data[0], instructions);
-    if (labelIp === -1) {
-        throw new SyntaxError(`Unable to find label ${instruction}`);
-    }
-
     const newLabelIp = data[1] % instructions.length;
     let newInstructions = [...instructions];
 
     if (labelIp !== newLabelIp) {
-        const removeFrom = {
-            name: instructions[labelIp].name,
-            data: instructions[labelIp].data
-        };
+        if (labelIp !== -1) {
+            const removeFrom = {
+                name: instructions[labelIp].name,
+                data: instructions[labelIp].data
+            };
+
+            newInstructions.splice(labelIp, 1, removeFrom);
+        }
 
         const addTo = {
             name: instructions[newLabelIp].name,
             data: instructions[newLabelIp].data,
             label: data[0]
         };
-        newInstructions.splice(labelIp, 1, removeFrom);
+
         newInstructions.splice(newLabelIp, 1, addTo);
     }
 

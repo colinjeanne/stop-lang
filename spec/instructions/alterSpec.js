@@ -23,8 +23,30 @@ describe('The ALTER instruction', () => {
         expect(() => getResult('"FOO" 0 1', 'FOO')).toThrowError(SyntaxError);
     });
 
-    it('fails if it cannot find the label', () => {
-        expect(() => getResult('"BAR" 0', 'FOO')).toThrowError(SyntaxError);
+    it('adds a label if one is not found', () => {
+        const instructions = [
+            'GOTO "FIRST"',
+            'GOTO "END"',
+            '(FIRST) ALTER "SECOND" 1',
+            'GOTO "SECOND"',
+            'ALTER "BAD" ; We should skip this',
+            '(END) NOOP'
+        ];
+
+        const program = new stopLang(instructions);
+        expect(program.execute()).not.toBeDefined();
+    });
+
+    it('can remove a label', () => {
+        const instructions = [
+            'ALTER UNDEFINED 2',
+            'GOTO "TEST"',
+            '(TEST) ALTER "BAD" ; We should skip this',
+            '(TEST) NOOP'
+        ];
+
+        const program = new stopLang(instructions);
+        expect(program.execute()).not.toBeDefined();
     });
 
     it('must take a string and an integer', () => {
@@ -33,14 +55,6 @@ describe('The ALTER instruction', () => {
         expect(() => getResult('"FOO" "bar"', 'FOO')).
             toThrowError(SyntaxError);
         expect(() => getResult('"FOO" [1]', 'FOO')).toThrowError(SyntaxError);
-
-        const undefinedLabel = new stopLang([
-            'NOOP',
-            'ALTER $0 0',
-            '(FOO) NOOP'
-        ]);
-
-        expect(() => undefinedLabel.execute()).toThrowError(SyntaxError);
 
         const undefinedIndex = new stopLang([
             'NOOP',

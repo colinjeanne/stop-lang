@@ -156,30 +156,48 @@ const extractList = (instruction, s) => {
  * @returns {ExtractionResult}
  */
 const extractReference = (instruction, s) => {
-    const matches = /^((\$|\$\$)?(?:((?:-|\+)?\d+)|ip((?:-|\+)\d+)?))/.exec(s);
-    if (!matches) {
-        throw new SyntaxError(
-            `Invalid reference in instruction ${instruction}`);
+    const isIndirect = s.startsWith('$$');
+    const startIndex = isIndirect ? 2 : 1;
+    const spaceIndex = s.indexOf(' ');
+    const endIndex = spaceIndex === -1 ? s.length : spaceIndex;
+    const rest = s.substring(startIndex, endIndex);
+
+    let value = null;
+    if (/^(-|\+)?\d+$/.test(rest)) {
+        // This references an absolute instruction index
+        const offset = parseInt(rest, 10);
+        if (isFinite(offset)) {
+            value = new Reference('', offset, isIndirect);
+        }
     }
 
-    const isIndirect = matches[2] === '$$';
-    const isRelative = matches[3] === undefined;
-
-    let refString = '0';
-    if (isRelative && matches[4] !== undefined) {
-        refString = matches[4];
-    } else if (!isRelative) {
-        refString = matches[3];
+    const ipMatch = /^ip((?:-|\+)\d+)?$/.exec(rest);
+    if (ipMatch) {
+        // This references an instruction relative to the current instruction
+        // pointer
+        const offset = ipMatch[1] === undefined ? 0 : parseInt(ipMatch[1]);
+        if (isFinite(offset)) {
+            value = new Reference('ip', offset, isIndirect);
+        }
     }
 
-    const ref = parseInt(refString, 10);
-    if (isNaN(ref) || !isFinite(ref)) {
+    const labelMatch = /^([A-Z]|[A-Z]+[A-Z-]*[A-Z]+)((?:-|\+)\d+)?$/.
+        exec(rest);
+    if (labelMatch) {
+        // This references an instruction relative to a label
+        const label = labelMatch[1];
+        const offset = labelMatch[2] === undefined ?
+            0 :
+            parseInt(labelMatch[2]);
+        if (isFinite(offset)) {
+            value = new Reference(label, offset, isIndirect);
+        }
+    }
+
+    if (!value) {
         throw new SyntaxError(
             `Invalid reference line in instruction ${instruction}`);
     }
-
-    const value = new Reference(ref, isIndirect, isRelative);
-    const endIndex = matches[1].length;
 
     return {endIndex, value};
 };
@@ -268,7 +286,7 @@ const parseDataAndComment = (instruction, dataAndComment) => {
 export default instruction => {
     let data = [];
 
-    const matches = /^ *(?:\(([A-Z-]+)\) +)?([A-Z-]+)(?: +(.*))? *$/.exec(instruction);
+    const matches = /^ *(?:\(([A-Z]|[A-Z]+[A-Z-]*[A-Z]+)\) +)?([A-Z-]+)(?: +(.*))? *$/.exec(instruction);
     if (!matches) {
         throw new SyntaxError(`Invalid instruction ${instruction}`);
     }

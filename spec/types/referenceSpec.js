@@ -77,12 +77,50 @@ describe('References', () => {
         expect(program.execute()).toBe(3);
     });
 
-    it('must be numeric', () => {
+    it('may reference labels', () => {
         const instructions = [
-            'NOOP $g'
+            '(TEST) NOOP 3',
+            'NOOP $TEST',
+        ];
+
+        const program = new stopLang(instructions);
+        expect(program.execute()).toBe(3);
+    });
+
+    it('may be relative to labels', () => {
+        const forwardProgram = new stopLang([
+            '(TEST) NOOP 3',
+            'NOOP 2',
+            'NOOP 1',
+            'NOOP $TEST+2',
+        ]);
+        expect(forwardProgram.execute()).toBe(1);
+
+        const reverseProgram = new stopLang([
+            'NOOP 2',
+            'NOOP 1',
+            '(TEST) NOOP 3',
+            'NOOP $TEST-2',
+        ]);
+        expect(reverseProgram.execute()).toBe(2);
+    });
+
+    it('label references must be upper case', () => {
+        const instructions = [
+            'NOOP $g',
+            '(G) NOOP'
         ];
 
         expect(() => new stopLang(instructions)).toThrowError(SyntaxError);
+    });
+
+    it('label references must reference actual labels', () => {
+        const instructions = [
+            'NOOP $TEST'
+        ];
+
+        const program = new stopLang(instructions);
+        expect(() => program.execute()).toThrowError(Error);
     });
 
     it('may be a double reference', () => {

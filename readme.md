@@ -38,7 +38,8 @@ The canonical form of a command is
 
     (LABEL) NAME [data1 data2 data3...] [; Comment]
 
-Labels and command names must appear in all caps.
+Labels and command may contain the uppercase letters A-Z and the hyphen `-` but
+may not begin or end with a hyphen.
 
 ## Types
 
@@ -150,7 +151,7 @@ the command at index 0 and so would evaluate to `"Do copy"`.
 ### Absolute vs. Relative
 References may either be absolute and refer to a specific command index or may
 be relative and refer to a command with respect to the current position of the
-instruction pointer.
+instruction pointer or with respect to a label.
 
 Absolute references always take an integer. If the referenced index is greater
 than the number of commands in the list then the index is interpreted as if it
@@ -163,16 +164,19 @@ were taken MOD the number of commands. Here are some examples:
 * `$4`: The first command in a four command program, the last command in a five
 command program, and the fifth command in a six command program.
 
-Similarly, relative commands take an integer which defaults to zero if omitted.
-Relative commands are relative to the current instruction pointer and, similar
-to absolute commands, the index is interpreted MOD the number of commands. Here
-are some examples:
+Similarly, relative commands take an integer which defaults to zero if omitted
+and which is interpreted MOD the number of commands. Here are some examples:
 
 * `$ip`: The current command
 * `$ip+0`: The current command
 * `$ip-0`: The current command
 * `$ip+1`: The command directly after the current command
 * `$ip-1`: The command directly before the current command
+* `$FOO`: The command with the label `FOO`
+* `$FOO+0`: The command with the label `FOO`
+* `$FOO-0`: The command with the label `FOO`
+* `$FOO+1`: The command directly after the command with the label `FOO`
+* `$FOO-1`: The command directly before the command with the label `FOO`
 
 ### Special Relativity
 Because referencing the value of the current command is never useful - it will
@@ -221,9 +225,10 @@ coverted to strings and concatenated.
 
 ### ALTER string number
 The `ALTER` command moves the first label with the given name in the list of
-commands to the specified command index. The command takes a string for the
-label's name and an integer representing the index to which the label will be
-moved.
+commands to the specified command index. The command takes a string or
+`UNDEFINED` for the label's name and an integer representing the index to which
+the label will be moved. If the label's name is `UNDEFINED` then the label is
+removed. If the label does not yet exist, it is added.
 
 The index is interpreted MOD the number of commands.
 
@@ -291,7 +296,7 @@ command takes a string for the label's name. If the condition is not provided
 then it is assumed to be truthy. If the condition is falsey then this command
 does not move the instruction pointer.
 
-This command returns `undefined`.
+This command returns `UNDEFINED`.
 
     GOTO "TEST" ; Jumps to the label "TEST"
 
