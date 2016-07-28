@@ -72,18 +72,6 @@ describe('The ERROR instruction', () => {
         let output = undefined;
         const stderr = v => output = v;
 
-        const program = new stopLang(
-            [
-                'NOOP',
-                'ERROR $0'
-            ],
-            () => {},
-            () => {},
-            stderr);
-
-        expect(program.execute()).not.toBeDefined();
-        expect(output).toBe('');
-
         expect(getResult('UNDEFINED', stderr)).not.toBeDefined();
         expect(output).toEqual('');
     });

@@ -92,7 +92,7 @@ export default class Reference {
 
         s += this.base;
 
-        if (this.offset !== 0) {
+        if ((this.offset !== 0) || (this.base === '')) {
             s += this.offset.toString();
         }
 

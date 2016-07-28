@@ -55,15 +55,8 @@ describe('The ALTER instruction', () => {
         expect(() => getResult('"FOO" "bar"', 'FOO')).
             toThrowError(SyntaxError);
         expect(() => getResult('"FOO" [1]', 'FOO')).toThrowError(SyntaxError);
-
-        const undefinedIndex = new stopLang([
-            'NOOP',
-            'ALTER "FOO" $0',
-            '(FOO) NOOP'
-        ]);
-
-        expect(() => undefinedIndex.execute()).toThrowError(SyntaxError);
-
+        expect(() => getResult('"FOO" UNDEFINED', 'FOO')).
+            toThrowError(SyntaxError);
         expect(getResult('"FOO" 0', 'FOO')).not.toBeDefined();
     });
 

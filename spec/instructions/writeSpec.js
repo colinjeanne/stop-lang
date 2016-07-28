@@ -71,17 +71,6 @@ describe('The WRITE instruction', () => {
         let output = undefined;
         const stdout = v => output = v;
 
-        const program = new stopLang(
-            [
-                'NOOP',
-                'WRITE $0'
-            ],
-            () => {},
-            stdout);
-
-        expect(program.execute()).not.toBeDefined();
-        expect(output).toBe('');
-
         expect(getResult('UNDEFINED', stdout)).not.toBeDefined();
         expect(output).toEqual('');
     });

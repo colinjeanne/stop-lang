@@ -28,8 +28,7 @@ describe('The ITEM instruction', () => {
 
     it('cannot take an undefined first argument', () => {
         const instructions = [
-            'ITEM $1 0',
-            'NOOP'
+            'ITEM UNDEFINED 0',
         ];
 
         const program = new stopLang(instructions);
@@ -45,15 +44,6 @@ describe('The ITEM instruction', () => {
         expect(() => getResult('[] -3')).toThrowError(SyntaxError);
         expect(() => getResult('[] NAN')).toThrowError(SyntaxError);
         expect(() => getResult('[] INFINITY')).toThrowError(SyntaxError);
-
-        const instructions = [
-            'ITEM [] $1',
-            'NOOP'
-        ];
-
-        const program = new stopLang(instructions);
-
-        expect(() => program.execute()).toThrowError(SyntaxError);
     });
 
     it('can return an item in a list', () => {

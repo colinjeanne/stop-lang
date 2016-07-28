@@ -29,89 +29,18 @@ import { isUndefined } from './types/undefined';
  * @property {number} ip The instruction pointer
  * @property {module:./parsing.ParsedInstruction[]} instructions
  * @property {*} data The data returned by the last instruction
+ * @property {inputCallback} stdin
+ * @property {outputCallback} stdout
+ * @property {outputCallback} stderr
  */
 
 /**
  * Updates a program state
  * @callback StateTransition
- * @param {number} ip The current instruction pointer
- * @param {module:./parsing.ParsedInstruction[]} instructions The current
- * instructions
- * @param {*} data The STOP data for the current instruction
- * @param {inputCallback} stdin
- * @param {outputCallback} stdout
- * @param {outputCallback} stderr
+ * @param {ProgramState} state The current program state
+ * @param {module:./parsing.ParsedInstruction} instruction The executing instruction
  * @returns {ProgramState}
  */
-
-/**
- * Converts a STOP reference into its referenced value
- * @type {StateTransition}
- */
-const applyReference = (ip, instructions, datum, stdin, stdout, stderr) => {
-    let ret = {
-        ip,
-        instructions,
-        data: datum
-    };
-
-    if (isReference(datum)) {
-        if (!datum.isIndirect) {
-            if ((datum.base === 'ip') && (datum.offset === 0)) {
-                ret.data = ip;
-            } else {
-                const finalIp = datum.instruction(ip, instructions);
-                const instructionRet =
-                    executeInstruction(
-                        finalIp,
-                        instructions,
-                        stdin,
-                        stdout,
-                        stderr);
-
-                ret.instructions = instructionRet.instructions;
-                ret.data = instructionRet.ret;
-            }
-        } else {
-            // Convert the double reference into a single reference
-            ret.data = datum.decay();
-        }
-    } else if (isList(datum)) {
-        ({instructions: ret.instructions, data: ret.data} =
-            applyReferences(
-                ip,
-                instructions,
-                datum,
-                stdin,
-                stdout,
-                stderr));
-    }
-    return ret;
-};
-
-/**
- * Converts all STOP references in an instruction to their referenced values
- * @type {StateTransition}
- */
-const applyReferences = (ip, instructions, data, stdin, stdout, stderr) =>
-    data.reduce(
-        (state, datum) => {
-            const appliedRet =
-                applyReference(
-                    ip,
-                    state.instructions,
-                    datum,
-                    stdin,
-                    stdout,
-                    stderr);
-            state.instructions = appliedRet.instructions;
-            state.data.push(appliedRet.data);
-            return state;
-        },
-        {
-            instructions,
-            data: []
-        });
 
 /**
  * Whether the data has any references
@@ -127,37 +56,188 @@ const hasReferences = data => {
 };
 
 /**
+ * Converts a STOP reference into its referenced value
+ * @param {ProgramState} state The current program state
+ * @param {module:./types/reference.Reference} reference The reference to deference
+ * @returns {{instructions: module:./parsing.ParsedInstruction[], data: *}} The
+ * updated set of instructions and the dereferenced value
+ */
+const dereference = (state, reference) => {
+    let ret = {
+        instructions: state.instructions,
+    };
+
+    if (!reference.isIndirect) {
+        if ((reference.base === 'ip') && (reference.offset === 0)) {
+            ret.data = state.ip;
+        } else {
+            const referenceState = Object.assign(
+                {},
+                state,
+                {
+                    ip: reference.instruction(state.ip, state.instructions)
+                });
+            const updatedState = executeInstruction(referenceState);
+
+            ret.instructions = updatedState.instructions;
+            ret.data = updatedState.data;
+        }
+    } else {
+        // Convert the double reference into a single reference
+        ret.data = reference.decay();
+    }
+
+    return ret;
+};
+
+/**
+ * Converts a single or a list of STOP reference into their referenced values
+ * @param {ProgramState} state The current program state
+ * @param {*} data A stop data type
+ * @returns {{state: ProgramState, data: *}} The updated program state and the
+ * dereferenced values
+ */
+const collectReferences = (state, data) => {
+    if (hasReferences(data)) {
+        if (isList(data)) {
+            data.reduce(
+                (aggregate, datum) => {
+                    const {state: updatedState, data: dereferencedData} =
+                        collectReferences(aggregate.state, datum);
+                    return Object.assign(
+                        {},
+                        aggregate,
+                        {
+                            state: updatedState,
+                            data: [...aggregate.data, dereferencedData]
+                        });
+                },
+                {
+                    state,
+                    data: []
+                });
+        } else if (isReference(data)) {
+            const {instructions, data: dereferencedData} =
+                dereference(state, data);
+
+            return {
+                state: Object.assign(
+                    {},
+                    state,
+                    {
+                        instructions
+                    }),
+                data: dereferencedData
+            };
+        }
+    }
+
+    return {
+        state,
+        data
+    };
+};
+
+/**
+ * Converts all STOP references in an instruction to their referenced values
+ * @param {ProgramState} state The current program state
+ * @param {module:./parsing.ParsedInstruction} instruction The executing instruction
+ * @returns {{state: ProgramState, instruction: module:./parsing.ParsedInstruction}} The
+ * updated program state and the instruction with the dereferenced data values
+ */
+const applyReferences = (state, instruction) => {
+    if (hasReferences(instruction.data)) {
+        if (isList(instruction.data)) {
+            return instruction.data.reduce(
+                (aggregate, datum) => {
+                    const {state: updatedState, data: dereferencedData} =
+                        collectReferences(aggregate.state, datum);
+
+                    return {
+                        state: Object.assign(
+                            {},
+                            aggregate.state,
+                            {
+                                instructions: updatedState.instructions
+                            }),
+                        instruction: Object.assign(
+                            {},
+                            aggregate.instruction,
+                            {
+                                data: [
+                                    ...aggregate.instruction.data,
+                                    dereferencedData
+                                ]
+                            })
+                    };
+                },
+                {
+                    state,
+                    instruction: Object.assign(
+                        {},
+                        instruction,
+                        {
+                            data: []
+                        })
+                });
+        } else if (isReference(instruction.data)) {
+            const {instructions, data} =
+                dereference(state, instruction.data);
+
+            return {
+                state: Object.assign(
+                    {},
+                    state,
+                    {
+                        instructions
+                    }),
+                instruction: Object.assign(
+                    {},
+                    instruction,
+                    {
+                        data
+                    })
+            };
+        }
+    }
+
+    return {
+        state,
+        instruction
+    };
+};
+
+/**
  * Prevents references from being passed to an instruction handler
  * @param {StateTransition} op
  * @returns {ProgramState}
  */
 const disallowReferences = op =>
-    (ip, instructions, data, stdin, stdout, stderr) => {
-        const instruction = instructions[ip];
+    (state, instruction) => {
         const name = instruction.name;
 
-        if (hasReferences(data)) {
+        if (hasReferences(instruction.data)) {
             throw new SyntaxError(
                 `${name} cannot take double references ${instruction}`);
         }
 
-        return op(ip, instructions, data, stdin, stdout, stderr);
+        return op(state, instruction);
     };
 
 /**
  * Ensures a specific number of arguments
- * @param {StateTransition} op
- * @returns {ProgramState}
+ * @param {number} min The minimum number of arguments
+ * @param {number} max The maximum number of arguments
+ * @returns {*}
  */
 const argumentCount = (min, max) => op =>
-    (ip, instructions, data, stdin, stdout, stderr) => {
-        const instruction = instructions[ip];
+    (state, instruction) => {
         const name = instruction.name;
 
         let argumentCount = 0;
-        if (isList(data)) {
-            argumentCount = data.length;
-        } else if (isUndefined(data)) {
+        if (isList(instruction.data)) {
+            argumentCount = instruction.data.length;
+        } else if (isUndefined(instruction.data)) {
             argumentCount = 0;
         } else {
             argumentCount = 1;
@@ -177,18 +257,21 @@ const argumentCount = (min, max) => op =>
             throw new SyntaxError(`${name} must take ${min} arguments`);
         }
 
-        return op(ip, instructions, data, stdin, stdout, stderr);
+        return op(state, instruction);
     };
 
 /**
  * Returns the passed in data unchanged
  * @type {StateTransition}
  */
-const noop = disallowReferences((ip, instructions, data) => ({
-    ip: ++ip,
-    instructions,
-    ret: data
-}));
+const noop = disallowReferences((state, instruction) =>
+    Object.assign(
+        {},
+        state,
+        {
+            ip: state.ip + 1,
+            data: instruction.data
+        }));
 
 /**
  * Finds the first index of a label within the set of instructions
@@ -204,472 +287,508 @@ const findLabelIndex = (label, instructions) =>
  * Moves a label to a new location within the set of instructions
  * @type {StateTransition}
  */
-const alter = argumentCount(2, 2)((ip, instructions, data) => {
-    const instruction = instructions[ip];
-
-    if ((!isString(data[0]) && !isUndefined(data[0])) || !isInteger(data[1])) {
+const alter = argumentCount(2, 2)((state, instruction) => {
+    if ((!isString(instruction.data[0]) &&
+         !isUndefined(instruction.data[0])) ||
+        !isInteger(instruction.data[1])) {
         throw new SyntaxError(
             `ALTER must take a string or UNDEFINED and an integer ${instruction}`);
     }
 
-    const labelIp = findLabelIndex(data[0], instructions);
-    const newLabelIp = data[1] % instructions.length;
-    let newInstructions = [...instructions];
+    const labelIp = findLabelIndex(instruction.data[0], state.instructions);
+    const newLabelIp = instruction.data[1] % state.instructions.length;
+    let newInstructions = [...state.instructions];
 
     if (labelIp !== newLabelIp) {
         if (labelIp !== -1) {
             const removeFrom = {
-                name: instructions[labelIp].name,
-                data: instructions[labelIp].data
+                name: state.instructions[labelIp].name,
+                data: state.instructions[labelIp].data
             };
 
             newInstructions.splice(labelIp, 1, removeFrom);
         }
 
         const addTo = {
-            name: instructions[newLabelIp].name,
-            data: instructions[newLabelIp].data,
-            label: data[0]
+            name: state.instructions[newLabelIp].name,
+            data: state.instructions[newLabelIp].data,
+            label: instruction.data[0]
         };
 
         newInstructions.splice(newLabelIp, 1, addTo);
     }
 
-    return {
-        ip: ++ip,
-        instructions: newInstructions
-    };
+    return Object.assign(
+        {},
+        state,
+        {
+            ip: state.ip + 1,
+            instructions: newInstructions,
+            data: undefined
+        });
 });
 
 /**
  * Conditionally moves the instruction pointer to a label
  * @type {StateTransition}
  */
-const gotoLabel = argumentCount(1, 2)((ip, instructions, data) => {
-    const instruction = instructions[ip];
-
-    if (!(isList(data) &&
-            (data.length === 2) &&
-            isString(data[0]) &&
-            ((data[1] === 0) || (data[1] === 1))) &&
-        !isString(data)) {
+const gotoLabel = argumentCount(1, 2)((state, instruction) => {
+    if (!(isList(instruction.data) &&
+            (instruction.data.length === 2) &&
+            isString(instruction.data[0]) &&
+            ((instruction.data[1] === 0) || (instruction.data[1] === 1))) &&
+        !isString(instruction.data)) {
         throw new SyntaxError(
             `GOTO must take a string and may take a condition ${instruction}`);
     }
 
     let label;
     let condition;
-    if (isList(data)) {
-        label = data[0];
-        condition = data[1];
+    if (isList(instruction.data)) {
+        label = instruction.data[0];
+        condition = instruction.data[1];
     } else {
-        label = data;
+        label = instruction.data;
         condition = true;
     }
 
-    const labelIp = findLabelIndex(label, instructions);
+    const labelIp = findLabelIndex(label, state.instructions);
     if (labelIp === -1) {
         throw new SyntaxError(`Unable to find label ${instruction}`);
     }
 
-    const newIp = condition ? labelIp : ++ip;
+    const newIp = condition ? labelIp : state.ip + 1;
 
-    return {
-        ip: newIp,
-        instructions
-    };
+    return Object.assign(
+        {},
+        state,
+        {
+            ip: newIp,
+            data: undefined
+        });
 });
 
 /**
  * Adds a new instruction to the front of the set of instructions
  * @type {StateTransition}
  */
-const push = argumentCount(1)((ip, instructions, data) => {
-    const instruction = instructions[ip];
-
-    if (isUndefined(data) ||
-        (isList(data) && ((data.length === 0) || !isString(data[0]))) &&
-        !isString(data)) {
+const push = argumentCount(1)((state, instruction) => {
+    if (isUndefined(instruction.data) ||
+        (isList(instruction.data) &&
+         ((instruction.data.length === 0) ||
+           !isString(instruction.data[0]))) &&
+        !isString(instruction.data)) {
         throw new SyntaxError(
             `PUSH must take an instruction ${instruction}`);
     }
 
     let newInstruction;
-    if (isList(data)) {
-        newInstruction = {
-            name: data[0],
-            data: data.slice(1)
-        };
+    if (isList(instruction.data)) {
+        const instructionString = [
+            instruction.data[0],
+            ...instruction.data.
+                slice(1).
+                map(Operations.valueToString)
+        ].join(' ');
+
+        newInstruction = parseInstruction(instructionString);
     } else {
-        newInstruction = {
-            name: data,
-            data: []
-        };
+        newInstruction = parseInstruction(instruction.data);
     }
 
-    const newInstructions = [newInstruction, ...instructions];
+    const newInstructions = [newInstruction, ...state.instructions];
 
     // Move the IP forward by two since we are adding an instruction to the
     // front and so the next instruction will be this one with if moved
     // normally.
-    const newIp = ip + 2;
+    const newIp = state.ip + 2;
 
-    return {
-        ip: newIp,
-        instructions: newInstructions
-    };
+    return Object.assign(
+        {},
+        state,
+        {
+            ip: newIp,
+            instructions: newInstructions,
+            data: undefined
+        });
 });
 
 /**
  * Removes the first instruction from the set of instructions
  * @type {StateTransition}
  */
-const pop = argumentCount(0, 0)((ip, instructions) => {
-    const newInstructions = [...instructions];
+const pop = argumentCount(0, 0)(state => {
+    const newInstructions = [...state.instructions];
     newInstructions.shift();
 
-    return {
-        // Since we have removed an instruction from the front, the instruction
-        // pointer automatically points to the next instruction.
-        ip: ip,
-        instructions: newInstructions
-    };
+    // Since we have removed an instruction from the front, the instruction
+    // pointer automatically points to the next instruction.
+    return Object.assign(
+        {},
+        state,
+        {
+            instructions: newInstructions,
+            data: undefined
+        });
 });
 
 /**
  * Adds a new instruction to the end of the set of instructions
  * @type {StateTransition}
  */
-const inject = argumentCount(1)((ip, instructions, data) => {
-    const instruction = instructions[ip];
-
-    if (isUndefined(data) ||
-        (isList(data) && ((data.length === 0) || !isString(data[0]))) &&
-        !isString(data)) {
+const inject = argumentCount(1)((state, instruction) => {
+    if (isUndefined(instruction.data) ||
+        (isList(instruction.data) &&
+         ((instruction.data.length === 0) ||
+           !isString(instruction.data[0]))) &&
+        !isString(instruction.data)) {
         throw new SyntaxError(
             `INJECT must take an instruction ${instruction}`);
     }
 
     let newInstruction;
-    if (isList(data)) {
-        newInstruction = {
-            name: data[0],
-            data: data.slice(1)
-        };
+    if (isList(instruction.data)) {
+        const instructionString = [
+            instruction.data[0],
+            ...instruction.data.
+                slice(1).
+                map(Operations.valueToString)
+        ].join(' ');
+
+        newInstruction = parseInstruction(instructionString);
     } else {
-        newInstruction = {
-            name: data,
-            data: []
-        };
+        newInstruction = parseInstruction(instruction.data);
     }
 
-    const newInstructions = [...instructions, newInstruction];
+    const newInstructions = [...state.instructions, newInstruction];
 
-    return {
-        ip: ++ip,
-        instructions: newInstructions
-    };
+    return Object.assign(
+        {},
+        state,
+        {
+            ip: state.ip + 1,
+            instructions: newInstructions,
+            data: undefined
+        });
 });
 
 /**
  * Removes the last instruction from the set of instructions
  * @type {StateTransition}
  */
-const eject = argumentCount(0, 0)((ip, instructions) => {
-    const newInstructions = [...instructions];
+const eject = argumentCount(0, 0)(state => {
+    const newInstructions = [...state.instructions];
     newInstructions.pop();
 
-    return {
-        ip: ++ip,
-        instructions: newInstructions
-    };
+    return Object.assign(
+        {},
+        state,
+        {
+            ip: state.ip + 1,
+            instructions: newInstructions,
+            data: undefined
+        });
 });
 
 /**
  * Adds two values or adds an item to the end of a list
  * @type {StateTransition}
  */
-const add = argumentCount(2)(disallowReferences((ip, instructions, data) => {
-    return {
-        ip: ++ip,
-        instructions,
-        ret: data.reduce(Operations.add)
-    };
-}));
+const add = argumentCount(2)(disallowReferences((state, instruction) =>
+    Object.assign(
+        {},
+        state,
+        {
+            ip: state.ip + 1,
+            data: instruction.data.reduce(Operations.add)
+        })));
 
 /**
  * Subtracts two numbers or removes values at specified indices in strings and
  * lists
  * @type {StateTransition}
  */
-const subtract = argumentCount(2)(
-    disallowReferences((ip, instructions, data) => {
-        const rhsArguments = data.slice(1);
+const subtract = argumentCount(2)(disallowReferences((state, instruction) => {
+    const rhsArguments = instruction.data.slice(1);
 
-        let ret;
-        if (rhsArguments.every(isNonnegativeInteger) &&
-            (rhsArguments.length > 0) &&
-            (isString(data[0]) || isList(data[0]))) {
-            ret = Operations.subtract(data[0], rhsArguments);
-        } else {
-            ret = data.reduce(Operations.subtract);
-        }
+    let ret;
+    if (rhsArguments.every(isNonnegativeInteger) &&
+        (rhsArguments.length > 0) &&
+        (isString(instruction.data[0]) || isList(instruction.data[0]))) {
+        ret = Operations.subtract(instruction.data[0], rhsArguments);
+    } else {
+        ret = instruction.data.reduce(Operations.subtract);
+    }
 
 
-        return {
-            ip: ++ip,
-            instructions,
-            ret
-        };
-    }));
+    return Object.assign(
+        {},
+        state,
+        {
+            ip: state.ip + 1,
+            data: ret
+        });
+}));
 
 /**
  * Multiplies numbers or repeats strings and arrays
  * @type {StateTransition}
  */
-const multiply = argumentCount(2)(
-    disallowReferences((ip, instructions, data) => {
-        return {
-            ip: ++ip,
-            instructions,
-            ret: data.reduce(Operations.multiply)
-        };
-    }));
+const multiply = argumentCount(2)(disallowReferences((state, instruction) =>
+    Object.assign(
+        {},
+        state,
+        {
+            ip: state.ip + 1,
+            data: instruction.data.reduce(Operations.multiply)
+        })));
 
 /**
  * Divides values
  * @type {StateTransition}
  */
-const divide = argumentCount(2)(
-    disallowReferences((ip, instructions, data) => {
-        return {
-            ip: ++ip,
-            instructions,
-            ret: data.reduce(Operations.divide)
-        };
-    }));
+const divide = argumentCount(2)(disallowReferences((state, instruction) =>
+    Object.assign(
+        {},
+        state,
+        {
+            ip: state.ip + 1,
+            data: instruction.data.reduce(Operations.divide)
+        })));
 
 /**
  * Performs the modulus operation against values
  * @type {StateTransition}
  */
-const mod = argumentCount(2)(disallowReferences((ip, instructions, data) => {
-    return {
-        ip: ++ip,
-        instructions,
-        ret: data.reduce(Operations.mod)
-    };
-}));
+const mod = argumentCount(2)(disallowReferences((state, instruction) =>
+    Object.assign(
+        {},
+        state,
+        {
+            ip: state.ip + 1,
+            data: instruction.data.reduce(Operations.mod)
+        })));
 
 /**
  * Bitwise ANDs values or finds the intersection of lists
  * @type {StateTransition}
  */
-const and = disallowReferences((ip, instructions, data) => {
+const and = disallowReferences((state, instruction) => {
     let ret = 0;
-    if (isList(data) && (data.length > 0)) {
-        ret = data.reduce(Operations.and);
+    if (isList(instruction.data) && (instruction.data.length > 0)) {
+        ret = instruction.data.reduce(Operations.and);
     } else {
-        ret = Operations.truthy(data);
+        ret = Operations.truthy(instruction.data);
     }
 
-    return {
-        ip: ++ip,
-        instructions,
-        ret: ret
-    };
+    return Object.assign(
+        {},
+        state,
+        {
+            ip: state.ip + 1,
+            data: ret
+        });
 });
 
 /**
  * Bitwise ORs values or finds the union of lists
  * @type {StateTransition}
  */
-const or = disallowReferences((ip, instructions, data) => {
+const or = disallowReferences((state, instruction) => {
     let ret = 0;
-    if (isList(data) && (data.length > 0)) {
-        ret = data.reduce(Operations.or);
+    if (isList(instruction.data) && (instruction.data.length > 0)) {
+        ret = instruction.data.reduce(Operations.or);
     } else {
-        ret = Operations.truthy(data);
+        ret = Operations.truthy(instruction.data);
     }
 
-    return {
-        ip: ++ip,
-        instructions,
-        ret: ret
-    };
+    return Object.assign(
+        {},
+        state,
+        {
+            ip: state.ip + 1,
+            data: ret
+        });
 });
 
 /**
  * Bitwise NOTs values or finds the set difference between lists
  * @type {StateTransition}
  */
-const not = disallowReferences((ip, instructions, data) => {
+const not = disallowReferences((state, instruction) => {
     let ret = 1;
-    if (isList(data) && (data.length > 0) && data.every(isList)) {
-        const rest = [].concat(...data.slice(1));
-        ret = data[0].filter(datum => rest.indexOf(datum) === -1);
+    if (isList(instruction.data) &&
+        (instruction.data.length > 0) &&
+        instruction.data.every(isList)) {
+        const rest = [].concat(...instruction.data.slice(1));
+        ret = instruction.data[0].filter(datum => rest.indexOf(datum) === -1);
     } else {
-        ret = Operations.falsey(data);
+        ret = Operations.falsey(instruction.data);
     }
 
-    return {
-        ip: ++ip,
-        instructions,
-        ret: ret
-    };
+    return Object.assign(
+        {},
+        state,
+        {
+            ip: state.ip + 1,
+            data: ret
+        });
 });
 
 /**
  * Returns 1 if all STOP values are equal and 0 otherwise
  * @type {StateTransition}
  */
-const equal = argumentCount(2)(disallowReferences((ip, instructions, data) => {
-    return {
-        ip: ++ip,
-        instructions,
-        ret: data.every(datum => Operations.areEqual(datum, data[0])) ? 1 : 0
-    };
-}));
+const equal = argumentCount(2)(disallowReferences((state, instruction) =>
+    Object.assign(
+        {},
+        state,
+        {
+            ip: state.ip + 1,
+            data: instruction.data.every(datum =>
+                Operations.areEqual(
+                    datum,
+                    instruction.data[0])) ? 1 : 0
+        })));
 
 /**
  * Returns 0 is any STOP value is not equal to the others and 1 otherwise
  * @type {StateTransition}
  */
-const notEqual = argumentCount(2)(
-    disallowReferences((ip, instructions, data) => {
-        const equalResult = equal(ip, instructions, data);
+const notEqual = argumentCount(2)(disallowReferences((state, instruction) => {
+    const equalResult = equal(state, instruction);
 
-        return {
-            ip: ++ip,
-            instructions,
-            ret: equalResult.ret ? 0 : 1
-        };
-    }));
+    return Object.assign(
+        {},
+        equalResult,
+        {
+            data: equalResult.data ? 0 : 1
+        });
+}));
 
 /**
  * Returns 1 if the arguments form a monotonically decreasing series
  * @type {StateTransition}
  */
-const less = argumentCount(2)(disallowReferences((ip, instructions, data) => {
+const less = argumentCount(2)(disallowReferences((state, instruction) => {
     let ret = 1;
-    for (let i = 1; i < data.length; ++i) {
-        const previousValue = data[i - 1];
+    for (let i = 1; i < instruction.data.length; ++i) {
+        const previousValue = instruction.data[i - 1];
 
         // Use not less than since some types (like undefined) are not ordered
         // with other types and so will return false for all comparisons.
-        if (!Operations.less(previousValue, data[i])) {
+        if (!Operations.less(previousValue, instruction.data[i])) {
             ret = 0;
             break;
         }
     }
 
-    return {
-        ip: ++ip,
-        instructions,
-        ret
-    };
+    return Object.assign(
+        {},
+        state,
+        {
+            ip: state.ip + 1,
+            data: ret
+        });
 }));
 
 /**
  * Returns the length of a list or string
  * @type {StateTransition}
  */
-const dataLength = argumentCount(1)(
-    disallowReferences((ip, instructions, data) => {
-        const instruction = instructions[ip];
-
-        if (!isString(data) && !isList(data)) {
+const dataLength = argumentCount(1)(disallowReferences(
+    (state, instruction) => {
+        if (!isString(instruction.data) && !isList(instruction.data)) {
             throw new SyntaxError(
                 `LENGTH data must be a string or list ${instruction}`);
         }
 
-        return {
-            ip: ++ip,
-            instructions,
-            ret: data.length
-        };
+        return Object.assign(
+            {},
+            state,
+            {
+                ip: state.ip + 1,
+                data: instruction.data.length
+            });
     }));
 
 /**
  * Retrieves the value at a given index in a list or string
  * @type {StateTransition}
  */
-const item = argumentCount(2, 2)(
-    disallowReferences((ip, instructions, data) => {
-        const instruction = instructions[ip];
+const item = argumentCount(2, 2)(disallowReferences((state, instruction) => {
+    if (!isString(instruction.data[0]) && !isList(instruction.data[0])) {
+        throw new SyntaxError(
+            `ITEM data must be a string or list ${instruction}`);
+    }
 
-        if (!isString(data[0]) && !isList(data[0])) {
-            throw new SyntaxError(
-                `ITEM data must be a string or list ${instruction}`);
-        }
+    if (!isNonnegativeInteger(instruction.data[1])) {
+        throw new SyntaxError(
+            `ITEM index must be a nonnegative integer ${instruction}`);
+    }
 
-        if (!isNonnegativeInteger(data[1])) {
-            throw new SyntaxError(
-                `ITEM index must be a nonnegative integer ${instruction}`);
-        }
-
-        return {
-            ip: ++ip,
-            instructions,
-            ret: data[0][data[1]]
-        };
-    }));
+    return Object.assign(
+        {},
+        state,
+        {
+            ip: state.ip + 1,
+            data: instruction.data[0][instruction.data[1]]
+        });
+}));
 
 /**
  * Returns a line from standard input
  * @type {StateTransition}
  */
-const readInput = argumentCount(0, 0)(
-    disallowReferences((ip, instructions, data, stdin) => {
-        const line = stdin();
-        const virtualInstruction = `NOOP ${line}`;
-        const parsed = parseInstruction(virtualInstruction);
+const readInput = argumentCount(0, 0)(disallowReferences(state => {
+    const line = state.stdin();
+    const virtualInstruction = `NOOP ${line}`;
+    const parsed = parseInstruction(virtualInstruction);
 
-        if (hasReferences(parsed.data)) {
-            throw new Error('READ cannot read references');
-        }
+    if (hasReferences(parsed.data)) {
+        throw new Error('READ cannot read references');
+    }
 
-        let finalData = undefined;
-        if (parsed.data.length === 1) {
-            finalData = parsed.data[0];
-        } else if (parsed.data.length > 1) {
-            finalData = parsed.data;
-        }
-
-        return {
-            ip: ++ip,
-            instructions,
-            ret: finalData
-        };
-    }));
+    return Object.assign(
+        {},
+        state,
+        {
+            ip: state.ip + 1,
+            data: parsed.data
+        });
+}));
 
 /**
  * Writes a line to standard output
  * @type {StateTransition}
  */
-const writeOutput = disallowReferences(
-    (ip, instructions, data, stdin, stdout) => {
-        stdout(Operations.valueToString(data));
+const writeOutput = disallowReferences((state, instruction) => {
+    state.stdout(Operations.valueToString(instruction.data));
 
-        return {
-            ip: ++ip,
-            instructions
-        };
-    });
+    return Object.assign(
+        {},
+        state,
+        {
+            ip: state.ip + 1,
+            data: undefined
+        });
+});
 
 /**
  * Writes a line to standard error
  * @type {StateTransition}
  */
-const errorOutput = disallowReferences(
-    (ip, instructions, data, stdin, stdout, stderr) => {
-        stderr(Operations.valueToString(data));
+const errorOutput = disallowReferences((state, instruction) => {
+    state.stderr(Operations.valueToString(instruction.data));
 
-        return {
-            ip: ++ip,
-            instructions
-        };
-    });
+    return Object.assign(
+        {},
+        state,
+        {
+            ip: state.ip + 1,
+            data: undefined
+        });
+});
 
 /**
  * A mapping between instruction names and instruction handlers
@@ -702,46 +821,19 @@ const knownInstructions = new Map([
 
 /**
  * Executes an instruction
- * @param {number} ip The instruction pointer
- * @param {module:./parsing.ParsedInstruction[]} instructions The instructions
- * @param {inputCallback} stdin
- * @param {outputCallback} stdout
- * @param {outputCallback} stderr
+ * @param {ProgramState} state The instruction pointer
  * @returns {ProgramState}
  */
-const executeInstruction = (ip, instructions, stdin, stdout, stderr) => {
-    const {name, data} = instructions[ip];
-    if (!knownInstructions.has(name)) {
-        throw new SyntaxError(`Unknown instruction ${name}`);
+const executeInstruction = state => {
+    const instruction = state.instructions[state.ip];
+    if (!knownInstructions.has(instruction.name)) {
+        throw new SyntaxError(`Unknown instruction ${instruction.name}`);
     }
 
-    const {
-        instructions: updatedInstructions,
-        data: parsedData
-    } = applyReferences(
-        ip,
-        instructions,
-        data,
-        stdin,
-        stdout,
-        stderr);
-
-    // Do unto yourself as you would do unto others
-    let finalData = undefined;
-    if (parsedData.length === 1) {
-        finalData = parsedData[0];
-    } else if (parsedData.length > 1) {
-        finalData = parsedData;
-    }
-
-    const instructionHandler = knownInstructions.get(name);
-    return instructionHandler(
-        ip,
-        updatedInstructions,
-        finalData,
-        stdin,
-        stdout,
-        stderr);
+    const instructionHandler = knownInstructions.get(instruction.name);
+    const {state: updatedState, instruction: dereferencedInstruction} =
+        applyReferences(state, instruction);
+    return instructionHandler(updatedState, dereferencedInstruction);
 };
 
 /**
@@ -760,11 +852,13 @@ export default class Program {
         stdin = () => {},
         stdout = () => {},
         stderr = () => {}) {
-        this.ip = 0;
-        this.instructions = instructions.map(parseInstruction);
-        this.stdin = stdin;
-        this.stdout = stdout;
-        this.stderr = stderr;
+        this.state = {
+            ip: 0,
+            instructions: instructions.map(parseInstruction),
+            stdin,
+            stdout,
+            stderr
+        };
     }
 
     /**
@@ -772,21 +866,10 @@ export default class Program {
      * instruction
      */
     execute() {
-        let finalData = undefined;
-        while (this.ip < this.instructions.length) {
-            const {ip, instructions, ret} =
-                executeInstruction(
-                    this.ip,
-                    this.instructions,
-                    this.stdin,
-                    this.stdout,
-                    this.stderr);
-
-            this.ip = ip;
-            this.instructions = instructions;
-            finalData = ret;
+        while (this.state.ip < this.state.instructions.length) {
+            this.state = executeInstruction(this.state);
         }
 
-        return finalData;
+        return this.state.data;
     }
 }

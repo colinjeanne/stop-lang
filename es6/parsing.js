@@ -10,6 +10,7 @@ import Reference from './types/reference';
  * @typedef {Object} ExtractionResult
  * @property {number} endIndex The first index that can begin a new extraction
  * @property {*} value The extracted value
+ * @property {?string} label The label associated with the instruction
  */
 
 /**
@@ -274,6 +275,12 @@ const parseDataAndComment = (instruction, dataAndComment) => {
         }
     }
 
+    if (data.length === 0) {
+        return undefined;
+    } else if (data.length === 1) {
+        return data[0];
+    }
+
     return data;
 };
 
@@ -284,7 +291,7 @@ const parseDataAndComment = (instruction, dataAndComment) => {
  * @throws {SyntaxError} Malformed instruction
  */
 export default instruction => {
-    let data = [];
+    let data = undefined;
 
     const matches = /^ *(?:\(([A-Z]|[A-Z]+[A-Z-]*[A-Z]+)\) +)?([A-Z-]+)(?: +(.*))? *$/.exec(instruction);
     if (!matches) {
