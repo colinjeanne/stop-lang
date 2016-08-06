@@ -16,18 +16,20 @@ const findLabelIndex = (label, instructions) =>
 /**
  * Returns the base instruction index for a reference
  * @param {string} base The base of the reference
- * @param {number} ip The current instruction pointer
- * @param {ParsedInstruction[]} instructions The list of instructions
+ * @param {module:./../exec.ProgramState} state The current program state
  * @returns {number}
  */
-const baseInstructionIndex = (base, ip, instructions) => {
+const baseInstructionIndex = (base, state) => {
     if (base === '') {
         return 0;
     } else if (base === 'ip') {
-        return ip;
+        return state.ip;
+    } else if (base === 'ci') {
+        const lastIndex = state.evaluationStack.length - 1;
+        return state.evaluationStack[lastIndex].pointer;
     }
 
-    const labelIndex = findLabelIndex(base, instructions);
+    const labelIndex = findLabelIndex(base, state.instructions);
     if (labelIndex === -1) {
         throw new Error(`Unable to find label ${base}`);
     }
@@ -65,19 +67,18 @@ export default class Reference {
 
     /**
      * Retrieves the referenced instruction's index
-     * @param {number} ip The current instruction pointer
-     * @param {module:./../parsing.ParsedInstruction[]} instructions The list of instructions
+     * @param {module:./../exec.ProgramState} state The current program state
      * @returns {number}
      */
-    instruction(ip, instructions) {
+    instruction(state) {
         // If the reference is negative then modding by the length will result
         // in a number between 0 and -instructions.length. Adding
         // instructions.length will return the value to the correct positive
         // range and behave as if the reference was counting from the end
         // rather than from the start.
-        const baseIndex = baseInstructionIndex(this.base, ip, instructions);
-        const modded = (baseIndex + this.offset) % instructions.length;
-        return modded < 0 ? modded + instructions.length : modded;
+        const baseIndex = baseInstructionIndex(this.base, state);
+        const modded = (baseIndex + this.offset) % state.instructions.length;
+        return modded < 0 ? modded + state.instructions.length : modded;
     }
 
     /**
@@ -121,9 +122,17 @@ export const isDirectReference = v => isReference(v) && !v.isIndirect;
 export const isIndirectReference = v => isReference(v) && v.isIndirect;
 
 /**
- * Whether the reference is for current the value of the instruction pointer
+ * Whether the reference is for the current value of the instruction pointer
  * @param {*} value
  * @returns {boolean}
  */
 export const isInstructionPointerReference = v =>
     isDirectReference(v) && (v.base === 'ip') && (v.offset === 0);
+
+/**
+ * Whether the reference is for the location of the current instruction
+ * @param {*} value
+ * @returns {boolean}
+ */
+export const isInstructionLocationReference = v =>
+    isDirectReference(v) && (v.base === 'ci') && (v.offset === 0);

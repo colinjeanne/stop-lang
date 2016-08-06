@@ -173,13 +173,13 @@ const extractReference = (instruction, s) => {
         }
     }
 
-    const ipMatch = /^ip((?:-|\+)\d+)?$/.exec(rest);
+    const ipMatch = /^(ip|ci)((?:-|\+)\d+)?$/.exec(rest);
     if (ipMatch) {
         // This references an instruction relative to the current instruction
-        // pointer
-        const offset = ipMatch[1] === undefined ? 0 : parseInt(ipMatch[1]);
+        // pointer or the location of the current instruction
+        const offset = ipMatch[2] === undefined ? 0 : parseInt(ipMatch[2]);
         if (isFinite(offset)) {
-            value = new Reference('ip', offset, isIndirect);
+            value = new Reference(ipMatch[1], offset, isIndirect);
         }
     }
 

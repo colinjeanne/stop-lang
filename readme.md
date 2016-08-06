@@ -25,7 +25,9 @@ reuse. Because the nature of a problem is not always known ahead of time, some
 commands are able to modify the set of commands. While the previous statement
 may make some feel uneasy, rest assured that the deque-based model that STOP is
 built on guarantees that commands are added in well-defined and expected
-locations.
+locations. Note that the instruction pointer always references the command that
+is currently being evaluated and which is not being evaluated as part of the
+evaluation of a reference.
 
 Each command has four parts: an optional label, a name, a set of arguments, and
 an optional comment. These parts are delimited by whitespace and, in order to
@@ -40,6 +42,9 @@ The canonical form of a command is
 
 Labels and command may contain the uppercase letters A-Z and the hyphen `-` but
 may not begin or end with a hyphen.
+
+The data in each command is evaluated sequentially left to right at the time
+the command is executed.
 
 ## Types
 
@@ -167,11 +172,16 @@ command program, and the fifth command in a six command program.
 Similarly, relative commands take an integer which defaults to zero if omitted
 and which is interpreted MOD the number of commands. Here are some examples:
 
-* `$ip`: The current command
-* `$ip+0`: The current command
-* `$ip-0`: The current command
-* `$ip+1`: The command directly after the current command
-* `$ip-1`: The command directly before the current command
+* `$ip`: The current instruction pointer
+* `$ip+0`: The current instruction pointer
+* `$ip-0`: The current instruction pointer
+* `$ip+1`: The command directly after the current instruction pointer
+* `$ip-1`: The command directly before the current instruction pointer
+* `$ci`: The current command
+* `$ci+0`: The current command
+* `$ci-0`: The current command
+* `$ci+1`: The command directly after the current command
+* `$ci-1`: The command directly before the current command
 * `$FOO`: The command with the label `FOO`
 * `$FOO+0`: The command with the label `FOO`
 * `$FOO-0`: The command with the label `FOO`
@@ -179,13 +189,16 @@ and which is interpreted MOD the number of commands. Here are some examples:
 * `$FOO-1`: The command directly before the command with the label `FOO`
 
 ### Special Relativity
-Because referencing the value of the current command is never useful - it will
-lead to an infinite loop - there are three special relative references which
-instead evaluate to the current value of the instruction pointer. They are:
+Because referencing the value of the current command or instruction pointer is
+never useful - it will lead to an infinite loop - there are six special
+relative references. They are:
 
-* `$ip`
-* `$ip+0`
-* `$ip-0`
+* `$ip`: The current value of the instruction pointer
+* `$ip+0`: The current value of the instruction pointer
+* `$ip-0`: The current value of the instruction pointer
+* `$ci`: The position of the current command in the set of commands
+* `$ci+0`: The position of the current command in the set of commands
+* `$ci-0`: The position of the current command in the set of commands
 
 ### Truthiness
 An explicit Boolean data type is unnecessary in STOP because of the existence

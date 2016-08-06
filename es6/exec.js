@@ -9,6 +9,7 @@ import * as Operations from './operations';
 import parseInstruction from './parsing';
 import {
     isDirectReference,
+    isInstructionLocationReference,
     isInstructionPointerReference,
     isReference } from './types/reference';
 import { isString } from './types/string';
@@ -713,10 +714,7 @@ const knownInstructions = new Map([
  * @returns {ProgramState} The updated program state
  */
 const descendIntoDirectReference = (state, reference) => {
-    const lastIndex = state.evaluationStack.length - 1;
-    const pointer = reference.instruction(
-        state.evaluationStack[lastIndex].pointer,
-        state.instructions);
+    const pointer = reference.instruction(state);
     const evaluationItem = {
         pointer,
         instruction: state.instructions[pointer]
@@ -752,33 +750,49 @@ const decayIndirectReferences = data => {
 };
 
 /**
+ * Decays an instruction pointer reference if possible
+ * @param {ProgramState} state The current program state
+ * @param {*} data The data which may contain a reference
+ * @returns {*}
+ */
+const decayInstructionPointerReference = (state, data) => {
+    if (isInstructionPointerReference(data)) {
+        return state.ip;
+    }
+    else if (isInstructionLocationReference(data)) {
+        const lastIndex = state.evaluationStack.length - 1;
+        return state.evaluationStack[lastIndex].pointer;
+    }
+
+    return data;
+};
+
+/**
  * Decays all instruction pointer references to the left of the first direct
  * references
- * @param {number} ip The current instruction pointer
+ * @param {ProgramState} state The current program state
  * @param {*} data The data which may contain references
  * @returns {*}
  */
-const decayInstructionPointerReferences = (ip, data) => {
+const decayKnownInstructionPointerReferences = (state, data) => {
     if (isList(data)) {
         let hasSeenDirectReference = false;
         return data.map(datum => {
             if (isDirectReference(datum) &&
-                !isInstructionPointerReference(datum)) {
+                !isInstructionPointerReference(datum) &&
+                !isInstructionLocationReference(datum)) {
                 hasSeenDirectReference = true;
             }
 
-            if (!isInstructionPointerReference(datum) ||
-                hasSeenDirectReference) {
-                return datum;
+            if (!hasSeenDirectReference) {
+                return decayInstructionPointerReference(state, datum);
             }
 
-            return ip;
+            return datum;
         });
-    } else if (isInstructionPointerReference(data)) {
-        return ip;
     }
 
-    return data;
+    return decayInstructionPointerReference(state, data);
 };
 
 /**
@@ -857,7 +871,9 @@ const advanceState = state => {
         {},
         instruction,
         {
-            data: decayInstructionPointerReferences(state.ip, instruction.data)
+            data: decayKnownInstructionPointerReferences(
+                state,
+                instruction.data)
         });
 
     const ipDecayedEvaluationItem = Object.assign(

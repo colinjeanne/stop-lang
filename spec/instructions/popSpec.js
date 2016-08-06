@@ -30,10 +30,10 @@ describe('The POP instruction', () => {
         const instructions = [
             'GOTO "TEST"',
             'POP',
-            '(TEST) NOOP $ip $1 $ip'
+            '(TEST) NOOP $ip $ci $1 $ip $ci'
         ];
 
         const program = new stopLang(instructions);
-        expect(program.execute()).toEqual([2, undefined, 1]);
+        expect(program.execute()).toEqual([2, 2, undefined, 1, 1]);
     });
 });

@@ -65,9 +65,9 @@ describe('The PUSH instruction', () => {
         const instructions = [
             'GOTO "TEST"',
             'PUSH "NOOP"',
-            '(TEST) NOOP $ip $1 $ip'
+            '(TEST) NOOP $ip $ci $1 $ip $ci'
         ];
 
-        expect(getResult(instructions)).toEqual([2, undefined, 3]);
+        expect(getResult(instructions)).toEqual([2, 2, undefined, 3, 3]);
     });
 });

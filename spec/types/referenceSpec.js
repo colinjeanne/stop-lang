@@ -42,9 +42,55 @@ describe('References', () => {
 
         const deepProgram = new stopLang([
             'NOOP 2',
-            'NOOP $ip-1',
-            'NOOP $ip-1',
+            'NOOP $ip-3',
+            'NOOP $ip-2',
             'NOOP $ip-1'
+        ]);
+        expect(deepProgram.execute()).toBe(2);
+    });
+
+    it('can reference the location of the current instruction', () => {
+        const instructions = [
+            'NOOP',
+            'NOOP',
+            'NOOP $ci'
+        ];
+
+        const program = new stopLang(instructions);
+        expect(program.execute()).toBe(2);
+    });
+
+    it('can reference the location of the current instruction while handling a reference', () => {
+        const instructions = [
+            'NOOP',
+            'NOOP $ci',
+            'NOOP $1'
+        ];
+
+        const program = new stopLang(instructions);
+        expect(program.execute()).toBe(1);
+    });
+
+    it('can reference a value relative to the location of the current instruction', () => {
+        const forwardProgram = new stopLang([
+            'NOOP 3',
+            'NOOP 1',
+            'NOOP $ci+1'
+        ]);
+        expect(forwardProgram.execute()).toBe(3);
+
+        const reverseProgram = new stopLang([
+            'NOOP 2',
+            'NOOP 1',
+            'NOOP $ci-1'
+        ]);
+        expect(reverseProgram.execute()).toBe(1);
+
+        const deepProgram = new stopLang([
+            'NOOP 2',
+            'NOOP $ci-1',
+            'NOOP $ci-1',
+            'NOOP $ci-1'
         ]);
         expect(deepProgram.execute()).toBe(2);
     });
