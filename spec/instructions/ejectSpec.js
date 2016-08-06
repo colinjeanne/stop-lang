@@ -20,4 +20,8 @@ describe('The EJECT instruction', () => {
     it('must be empty', () => {
         expect(() => getResult('1')).toThrowError(SyntaxError);
     });
+
+    it('can remove itself', () => {
+        expect(getResult('')).not.toBeDefined();
+    });
 });

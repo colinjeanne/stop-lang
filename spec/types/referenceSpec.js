@@ -14,6 +14,17 @@ describe('References', () => {
         expect(program.execute()).toBe(2);
     });
 
+    it('can reference the current instruction pointer while handling a reference', () => {
+        const instructions = [
+            'NOOP',
+            'NOOP $ip',
+            'NOOP $1'
+        ];
+
+        const program = new stopLang(instructions);
+        expect(program.execute()).toBe(2);
+    });
+
     it('can reference a value relative to the instruction pointer', () => {
         const forwardProgram = new stopLang([
             'NOOP 2',
@@ -28,6 +39,14 @@ describe('References', () => {
             'NOOP $ip-1'
         ]);
         expect(reverseProgram.execute()).toBe(1);
+
+        const deepProgram = new stopLang([
+            'NOOP 2',
+            'NOOP $ip-1',
+            'NOOP $ip-1',
+            'NOOP $ip-1'
+        ]);
+        expect(deepProgram.execute()).toBe(2);
     });
 
     it('can reference the return value of another instruction', () => {
@@ -131,6 +150,30 @@ describe('References', () => {
 
         const program = new stopLang(instructions);
         expect(program.execute()).toBe('foo');
+    });
+
+    it('can appear multiple times in instruction data', () => {
+        const instructions = [
+            'NOOP 3',
+            'NOOP 2',
+            'INJECT "NOOP" $$0 $$1'
+        ];
+
+        const program = new stopLang(instructions);
+        expect(program.execute()).toEqual([3, 2]);
+    });
+
+    it('can reference instructions which themselves contain references', () => {
+        const instructions = [
+            'NOOP 3',
+            'NOOP 2',
+            'NOOP $0 $1',
+            'NOOP $1 $0',
+            'NOOP $2 $3 $1'
+        ];
+
+        const program = new stopLang(instructions);
+        expect(program.execute()).toEqual([[3, 2], [2, 3], 2]);
     });
 
     it('pass through stdin', () => {

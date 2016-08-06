@@ -7,7 +7,10 @@ import { isList } from './types/list';
 import { isInteger, isNonnegativeInteger } from './types/number';
 import * as Operations from './operations';
 import parseInstruction from './parsing';
-import { isReference } from './types/reference';
+import {
+    isDirectReference,
+    isInstructionPointerReference,
+    isReference } from './types/reference';
 import { isString } from './types/string';
 import { isUndefined } from './types/undefined';
 
@@ -28,7 +31,8 @@ import { isUndefined } from './types/undefined';
  * @typedef {Object} ProgramState
  * @property {number} ip The instruction pointer
  * @property {module:./parsing.ParsedInstruction[]} instructions
- * @property {*} data The data returned by the last instruction
+ * @property {{instruction: module:./parsing.ParsedInstruction, pointer: number}[]} evaluationStack A stack of instructions to process while evaluating instruction arguments
+ * @property {*} lastReturnedData The data returned by the last instruction
  * @property {inputCallback} stdin
  * @property {outputCallback} stdout
  * @property {outputCallback} stderr
@@ -56,155 +60,16 @@ const hasReferences = data => {
 };
 
 /**
- * Converts a STOP reference into its referenced value
- * @param {ProgramState} state The current program state
- * @param {module:./types/reference.Reference} reference The reference to deference
- * @returns {{instructions: module:./parsing.ParsedInstruction[], data: *}} The
- * updated set of instructions and the dereferenced value
+ * Whether the data has any direct references
+ * @param {*} data
+ * @returns {boolean}
  */
-const dereference = (state, reference) => {
-    let ret = {
-        instructions: state.instructions,
-    };
-
-    if (!reference.isIndirect) {
-        if ((reference.base === 'ip') && (reference.offset === 0)) {
-            ret.data = state.ip;
-        } else {
-            const referenceState = Object.assign(
-                {},
-                state,
-                {
-                    ip: reference.instruction(state.ip, state.instructions)
-                });
-            const updatedState = executeInstruction(referenceState);
-
-            ret.instructions = updatedState.instructions;
-            ret.data = updatedState.data;
-        }
-    } else {
-        // Convert the double reference into a single reference
-        ret.data = reference.decay();
+const hasDirectReferences = data => {
+    if (isList(data)) {
+        return data.some(hasDirectReferences);
     }
 
-    return ret;
-};
-
-/**
- * Converts a single or a list of STOP reference into their referenced values
- * @param {ProgramState} state The current program state
- * @param {*} data A stop data type
- * @returns {{state: ProgramState, data: *}} The updated program state and the
- * dereferenced values
- */
-const collectReferences = (state, data) => {
-    if (hasReferences(data)) {
-        if (isList(data)) {
-            data.reduce(
-                (aggregate, datum) => {
-                    const {state: updatedState, data: dereferencedData} =
-                        collectReferences(aggregate.state, datum);
-                    return Object.assign(
-                        {},
-                        aggregate,
-                        {
-                            state: updatedState,
-                            data: [...aggregate.data, dereferencedData]
-                        });
-                },
-                {
-                    state,
-                    data: []
-                });
-        } else if (isReference(data)) {
-            const {instructions, data: dereferencedData} =
-                dereference(state, data);
-
-            return {
-                state: Object.assign(
-                    {},
-                    state,
-                    {
-                        instructions
-                    }),
-                data: dereferencedData
-            };
-        }
-    }
-
-    return {
-        state,
-        data
-    };
-};
-
-/**
- * Converts all STOP references in an instruction to their referenced values
- * @param {ProgramState} state The current program state
- * @param {module:./parsing.ParsedInstruction} instruction The executing instruction
- * @returns {{state: ProgramState, instruction: module:./parsing.ParsedInstruction}} The
- * updated program state and the instruction with the dereferenced data values
- */
-const applyReferences = (state, instruction) => {
-    if (hasReferences(instruction.data)) {
-        if (isList(instruction.data)) {
-            return instruction.data.reduce(
-                (aggregate, datum) => {
-                    const {state: updatedState, data: dereferencedData} =
-                        collectReferences(aggregate.state, datum);
-
-                    return {
-                        state: Object.assign(
-                            {},
-                            aggregate.state,
-                            {
-                                instructions: updatedState.instructions
-                            }),
-                        instruction: Object.assign(
-                            {},
-                            aggregate.instruction,
-                            {
-                                data: [
-                                    ...aggregate.instruction.data,
-                                    dereferencedData
-                                ]
-                            })
-                    };
-                },
-                {
-                    state,
-                    instruction: Object.assign(
-                        {},
-                        instruction,
-                        {
-                            data: []
-                        })
-                });
-        } else if (isReference(instruction.data)) {
-            const {instructions, data} =
-                dereference(state, instruction.data);
-
-            return {
-                state: Object.assign(
-                    {},
-                    state,
-                    {
-                        instructions
-                    }),
-                instruction: Object.assign(
-                    {},
-                    instruction,
-                    {
-                        data
-                    })
-            };
-        }
-    }
-
-    return {
-        state,
-        instruction
-    };
+    return isDirectReference(data);
 };
 
 /**
@@ -270,7 +135,7 @@ const noop = disallowReferences((state, instruction) =>
         state,
         {
             ip: state.ip + 1,
-            data: instruction.data
+            lastReturnedData: instruction.data
         }));
 
 /**
@@ -324,7 +189,7 @@ const alter = argumentCount(2, 2)((state, instruction) => {
         {
             ip: state.ip + 1,
             instructions: newInstructions,
-            data: undefined
+            lastReturnedData: undefined
         });
 });
 
@@ -364,7 +229,7 @@ const gotoLabel = argumentCount(1, 2)((state, instruction) => {
         state,
         {
             ip: newIp,
-            data: undefined
+            lastReturnedData: undefined
         });
 });
 
@@ -403,13 +268,24 @@ const push = argumentCount(1)((state, instruction) => {
     // normally.
     const newIp = state.ip + 2;
 
+    // Since we've added a new instruction, every instruction in the evaluation
+    // stack has moved forward by one.
+    const newEvaluationStack = state.evaluationStack.map(evaluationItem =>
+        Object.assign(
+            {},
+            evaluationItem,
+            {
+                pointer: evaluationItem.pointer + 1
+            }));
+
     return Object.assign(
         {},
         state,
         {
             ip: newIp,
             instructions: newInstructions,
-            data: undefined
+            evaluationStack: newEvaluationStack,
+            lastReturnedData: undefined
         });
 });
 
@@ -421,6 +297,16 @@ const pop = argumentCount(0, 0)(state => {
     const newInstructions = [...state.instructions];
     newInstructions.shift();
 
+    // Since we've added a new instruction, every instruction in the evaluation
+    // stack has moved forward by one.
+    const newEvaluationStack = state.evaluationStack.map(evaluationItem =>
+        Object.assign(
+            {},
+            evaluationItem,
+            {
+                pointer: evaluationItem.pointer - 1
+            }));
+
     // Since we have removed an instruction from the front, the instruction
     // pointer automatically points to the next instruction.
     return Object.assign(
@@ -428,7 +314,8 @@ const pop = argumentCount(0, 0)(state => {
         state,
         {
             instructions: newInstructions,
-            data: undefined
+            evaluationStack: newEvaluationStack,
+            lastReturnedData: undefined
         });
 });
 
@@ -468,7 +355,7 @@ const inject = argumentCount(1)((state, instruction) => {
         {
             ip: state.ip + 1,
             instructions: newInstructions,
-            data: undefined
+            lastReturnedData: undefined
         });
 });
 
@@ -486,7 +373,7 @@ const eject = argumentCount(0, 0)(state => {
         {
             ip: state.ip + 1,
             instructions: newInstructions,
-            data: undefined
+            lastReturnedData: undefined
         });
 });
 
@@ -500,7 +387,7 @@ const add = argumentCount(2)(disallowReferences((state, instruction) =>
         state,
         {
             ip: state.ip + 1,
-            data: instruction.data.reduce(Operations.add)
+            lastReturnedData: instruction.data.reduce(Operations.add)
         })));
 
 /**
@@ -526,7 +413,7 @@ const subtract = argumentCount(2)(disallowReferences((state, instruction) => {
         state,
         {
             ip: state.ip + 1,
-            data: ret
+            lastReturnedData: ret
         });
 }));
 
@@ -540,7 +427,7 @@ const multiply = argumentCount(2)(disallowReferences((state, instruction) =>
         state,
         {
             ip: state.ip + 1,
-            data: instruction.data.reduce(Operations.multiply)
+            lastReturnedData: instruction.data.reduce(Operations.multiply)
         })));
 
 /**
@@ -553,7 +440,7 @@ const divide = argumentCount(2)(disallowReferences((state, instruction) =>
         state,
         {
             ip: state.ip + 1,
-            data: instruction.data.reduce(Operations.divide)
+            lastReturnedData: instruction.data.reduce(Operations.divide)
         })));
 
 /**
@@ -566,7 +453,7 @@ const mod = argumentCount(2)(disallowReferences((state, instruction) =>
         state,
         {
             ip: state.ip + 1,
-            data: instruction.data.reduce(Operations.mod)
+            lastReturnedData: instruction.data.reduce(Operations.mod)
         })));
 
 /**
@@ -586,7 +473,7 @@ const and = disallowReferences((state, instruction) => {
         state,
         {
             ip: state.ip + 1,
-            data: ret
+            lastReturnedData: ret
         });
 });
 
@@ -607,7 +494,7 @@ const or = disallowReferences((state, instruction) => {
         state,
         {
             ip: state.ip + 1,
-            data: ret
+            lastReturnedData: ret
         });
 });
 
@@ -631,7 +518,7 @@ const not = disallowReferences((state, instruction) => {
         state,
         {
             ip: state.ip + 1,
-            data: ret
+            lastReturnedData: ret
         });
 });
 
@@ -645,7 +532,7 @@ const equal = argumentCount(2)(disallowReferences((state, instruction) =>
         state,
         {
             ip: state.ip + 1,
-            data: instruction.data.every(datum =>
+            lastReturnedData: instruction.data.every(datum =>
                 Operations.areEqual(
                     datum,
                     instruction.data[0])) ? 1 : 0
@@ -662,7 +549,7 @@ const notEqual = argumentCount(2)(disallowReferences((state, instruction) => {
         {},
         equalResult,
         {
-            data: equalResult.data ? 0 : 1
+            lastReturnedData: equalResult.lastReturnedData ? 0 : 1
         });
 }));
 
@@ -688,7 +575,7 @@ const less = argumentCount(2)(disallowReferences((state, instruction) => {
         state,
         {
             ip: state.ip + 1,
-            data: ret
+            lastReturnedData: ret
         });
 }));
 
@@ -708,7 +595,7 @@ const dataLength = argumentCount(1)(disallowReferences(
             state,
             {
                 ip: state.ip + 1,
-                data: instruction.data.length
+                lastReturnedData: instruction.data.length
             });
     }));
 
@@ -732,7 +619,7 @@ const item = argumentCount(2, 2)(disallowReferences((state, instruction) => {
         state,
         {
             ip: state.ip + 1,
-            data: instruction.data[0][instruction.data[1]]
+            lastReturnedData: instruction.data[0][instruction.data[1]]
         });
 }));
 
@@ -754,7 +641,7 @@ const readInput = argumentCount(0, 0)(disallowReferences(state => {
         state,
         {
             ip: state.ip + 1,
-            data: parsed.data
+            lastReturnedData: parsed.data
         });
 }));
 
@@ -770,7 +657,7 @@ const writeOutput = disallowReferences((state, instruction) => {
         state,
         {
             ip: state.ip + 1,
-            data: undefined
+            lastReturnedData: undefined
         });
 });
 
@@ -786,7 +673,7 @@ const errorOutput = disallowReferences((state, instruction) => {
         state,
         {
             ip: state.ip + 1,
-            data: undefined
+            lastReturnedData: undefined
         });
 });
 
@@ -820,20 +707,229 @@ const knownInstructions = new Map([
 ]);
 
 /**
- * Executes an instruction
+ * Pushes the referenced instruction to the head of the evaulation stack
+ * @param {ProgramState} state The current program state
+ * @param {module:./types/reference.Reference} reference The reference to deference
+ * @returns {ProgramState} The updated program state
+ */
+const descendIntoDirectReference = (state, reference) => {
+    const lastIndex = state.evaluationStack.length - 1;
+    const pointer = reference.instruction(
+        state.evaluationStack[lastIndex].pointer,
+        state.instructions);
+    const evaluationItem = {
+        pointer,
+        instruction: state.instructions[pointer]
+    };
+
+    return Object.assign(
+        {},
+        state,
+        {
+            evaluationStack: [...state.evaluationStack, evaluationItem]
+        });
+};
+
+/**
+ * Decays all indirect references into a direct references
+ * @param {*} data The data which contains indirect references
+ * @returns {*}
+ */
+const decayIndirectReferences = data => {
+    if (isList(data)) {
+        return data.map(datum => {
+            if (isReference(datum)) {
+                return datum.decay();
+            }
+
+            return datum;
+        });
+    } else if (isReference(data)) {
+        return data.decay();
+    }
+
+    return data;
+};
+
+/**
+ * Decays all instruction pointer references to the left of the first direct
+ * references
+ * @param {number} ip The current instruction pointer
+ * @param {*} data The data which may contain references
+ * @returns {*}
+ */
+const decayInstructionPointerReferences = (ip, data) => {
+    if (isList(data)) {
+        let hasSeenDirectReference = false;
+        return data.map(datum => {
+            if (isDirectReference(datum) &&
+                !isInstructionPointerReference(datum)) {
+                hasSeenDirectReference = true;
+            }
+
+            if (!isInstructionPointerReference(datum) ||
+                hasSeenDirectReference) {
+                return datum;
+            }
+
+            return ip;
+        });
+    } else if (isInstructionPointerReference(data)) {
+        return ip;
+    }
+
+    return data;
+};
+
+/**
+ * Replaces the left-most direct reference with the given data
+ * @param {module:./parsing.ParsedInstruction} instruction The instruction with a direct reference
+ * @param {*} data The data which may contain references
+ * @returns {module:./parsing.ParsedInstruction}
+ */
+const replaceFirstDirectReference = (instruction, data) => {
+    if (isList(instruction.data)) {
+        const index = instruction.data.findIndex(isDirectReference);
+
+        let updatedData;
+        if (index === 0) {
+            updatedData = [data, ...instruction.data.slice(1)];
+        } else if (index === (instruction.data.length - 1)) {
+            updatedData = [...instruction.data.slice(0, -1), data];
+        } else {
+            updatedData = [
+                ...instruction.data.slice(0, index),
+                data,
+                ...instruction.data.slice(index + 1)
+            ];
+        }
+
+        return Object.assign(
+            {},
+            instruction,
+            {
+                data: updatedData
+            });
+    }
+
+    // The instruction's data must be a reference, just replace it.
+    return Object.assign(
+        {},
+        instruction,
+        {
+            data
+        });
+};
+
+/**
+ * Pushes the referenced instruction to the head of the evaulation stack for
+ * the next direct reference
+ * @param {ProgramState} state The current program state
+ * @param {module:./parsing.ParsedInstruction} instruction The executing instruction
+ * @returns {ProgramState} The updated program state
+ */
+const descendIntoNextDirectReference = (state, instruction) => {
+    if (isList(instruction.data)) {
+        const index = instruction.data.findIndex(isDirectReference);
+        return descendIntoDirectReference(state, instruction.data[index]);
+    }
+
+    // The instruction data must be a reference
+    return descendIntoDirectReference(state, instruction.data);
+};
+
+/**
+ * Advances the state of a program
  * @param {ProgramState} state The instruction pointer
  * @returns {ProgramState}
  */
-const executeInstruction = state => {
-    const instruction = state.instructions[state.ip];
+const advanceState = state => {
+    const lastIndex = state.evaluationStack.length - 1;
+    const instruction = state.evaluationStack[lastIndex].instruction;
     if (!knownInstructions.has(instruction.name)) {
         throw new SyntaxError(`Unknown instruction ${instruction.name}`);
     }
 
-    const instructionHandler = knownInstructions.get(instruction.name);
-    const {state: updatedState, instruction: dereferencedInstruction} =
-        applyReferences(state, instruction);
-    return instructionHandler(updatedState, dereferencedInstruction);
+    // Decay any references to the value of the instruction pointer that occur
+    // before any other direct references because direct references may change
+    // the instruction pointer.
+    const ipDecayedInstruction = Object.assign(
+        {},
+        instruction,
+        {
+            data: decayInstructionPointerReferences(state.ip, instruction.data)
+        });
+
+    const ipDecayedEvaluationItem = Object.assign(
+        {},
+        state.evaluationStack[lastIndex],
+        {
+            instruction: ipDecayedInstruction
+        });
+
+    const ipDecayedState = Object.assign(
+        {},
+        state,
+        {
+            evaluationStack: [
+                ...state.evaluationStack.slice(0, -1),
+                ipDecayedEvaluationItem
+            ]
+        });
+
+    if (hasDirectReferences(ipDecayedInstruction.data)) {
+        return descendIntoNextDirectReference(ipDecayedState, ipDecayedInstruction);
+    }
+
+    const decayedData = decayIndirectReferences(ipDecayedInstruction.data);
+    const decayedInstruction = Object.assign(
+        {},
+        ipDecayedInstruction,
+        {
+            data: decayedData
+        });
+
+    const reducedEvaluationStackState = Object.assign(
+        {},
+        ipDecayedState,
+        {
+            evaluationStack: ipDecayedState.evaluationStack.slice(0, -1)
+        });
+
+    const instructionHandler = knownInstructions.get(ipDecayedInstruction.name);
+    const updatedState = instructionHandler(
+        reducedEvaluationStackState,
+        decayedInstruction);
+
+    if (updatedState.evaluationStack.length > 0) {
+        // We must have recursed downward due to an earlier direct reference.
+        // Replace that reference with the data generated by this instruction.
+        const evaluationItem = updatedState.evaluationStack[lastIndex - 1];
+        const updatedEvaluationItem = Object.assign(
+            {},
+            evaluationItem,
+            {
+                instruction: replaceFirstDirectReference(
+                    evaluationItem.instruction,
+                    updatedState.lastReturnedData)
+            });
+
+        return Object.assign(
+            {},
+            updatedState,
+            {
+                // The set of instructions may have been updated while
+                // processing this instruction, reset the instruction pointer
+                // to the current location of this instruction.
+                ip: updatedEvaluationItem.pointer,
+                evaluationStack: [
+                    ...updatedState.evaluationStack.slice(0, -1),
+                    updatedEvaluationItem
+                ]
+            });
+    }
+
+    return updatedState;
 };
 
 /**
@@ -855,6 +951,7 @@ export default class Program {
         this.state = {
             ip: 0,
             instructions: instructions.map(parseInstruction),
+            evaluationStack: [],
             stdin,
             stdout,
             stderr
@@ -867,9 +964,16 @@ export default class Program {
      */
     execute() {
         while (this.state.ip < this.state.instructions.length) {
-            this.state = executeInstruction(this.state);
+            if (this.state.evaluationStack.length === 0) {
+                this.state.evaluationStack.push({
+                    instruction: this.state.instructions[this.state.ip],
+                    pointer: this.state.ip
+                });
+            }
+
+            this.state = advanceState(this.state);
         }
 
-        return this.state.data;
+        return this.state.lastReturnedData;
     }
 }

@@ -148,6 +148,7 @@ const extractList = (instruction, s) => {
  * @typedef {Object} ParsedInstruction
  * @property {string} name The name of the instruction
  * @property {*[]} data An array of extracted values
+ * @property {?string} label The instruction label
  */
 
 /**

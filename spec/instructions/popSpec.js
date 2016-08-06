@@ -21,4 +21,19 @@ describe('The POP instruction', () => {
     it('must be empty', () => {
         expect(() => getResult('1')).toThrowError(SyntaxError);
     });
+
+    it('can remove itself', () => {
+        expect(getResult('')).not.toBeDefined();
+    });
+
+    it('can update the value instruction pointer', () => {
+        const instructions = [
+            'GOTO "TEST"',
+            'POP',
+            '(TEST) NOOP $ip $1 $ip'
+        ];
+
+        const program = new stopLang(instructions);
+        expect(program.execute()).toEqual([2, undefined, 1]);
+    });
 });

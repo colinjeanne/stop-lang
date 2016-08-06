@@ -60,4 +60,14 @@ describe('The PUSH instruction', () => {
 
         expect(getResult(instructions)).toEqual('foo');
     });
+
+    it('can update the value instruction pointer', () => {
+        const instructions = [
+            'GOTO "TEST"',
+            'PUSH "NOOP"',
+            '(TEST) NOOP $ip $1 $ip'
+        ];
+
+        expect(getResult(instructions)).toEqual([2, undefined, 3]);
+    });
 });

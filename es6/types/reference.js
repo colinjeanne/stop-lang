@@ -3,8 +3,6 @@
  * @module ./types/reference
  */
 
-import { isUndefined } from './undefined';
-
 /**
  * Finds the first index of a label within the set of instructions
  * @param {string} label
@@ -68,7 +66,8 @@ export default class Reference {
     /**
      * Retrieves the referenced instruction's index
      * @param {number} ip The current instruction pointer
-     * @param {ParsedInstruction[]} instructions The list of instructions
+     * @param {module:./../parsing.ParsedInstruction[]} instructions The list of instructions
+     * @returns {number}
      */
     instruction(ip, instructions) {
         // If the reference is negative then modding by the length will result
@@ -105,4 +104,26 @@ export default class Reference {
  * @param {*} value
  * @returns {boolean}
  */
-export const isReference = v => !isUndefined(v) && v.hasOwnProperty('base');
+export const isReference = v => v instanceof Reference;
+
+/**
+ * Whether a value is a STOP direct reference
+ * @param {*} value
+ * @returns {boolean}
+ */
+export const isDirectReference = v => isReference(v) && !v.isIndirect;
+
+/**
+ * Whether a value is a STOP indirect reference
+ * @param {*} value
+ * @returns {boolean}
+ */
+export const isIndirectReference = v => isReference(v) && v.isIndirect;
+
+/**
+ * Whether the reference is for current the value of the instruction pointer
+ * @param {*} value
+ * @returns {boolean}
+ */
+export const isInstructionPointerReference = v =>
+    isDirectReference(v) && (v.base === 'ip') && (v.offset === 0);
