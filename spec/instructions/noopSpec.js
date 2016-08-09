@@ -3,7 +3,8 @@ const stopLang = require('../../umd/stop.js');
 describe('The NOOP instruction', () => {
     const getResult = dataString => {
         const program = new stopLang([`NOOP ${dataString}`]);
-        return program.execute();
+        program.go();
+        return program.currentResult;
     };
 
     it('can take zero arguments', () => {

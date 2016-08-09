@@ -3,7 +3,8 @@ const stopLang = require('../../umd/stop.js');
 describe('The ITEM instruction', () => {
     const getResult = dataString => {
         const program = new stopLang([`ITEM ${dataString}`]);
-        return program.execute();
+        program.go();
+        return program.currentResult;
     };
 
     it('cannot be empty', () => {
@@ -33,7 +34,7 @@ describe('The ITEM instruction', () => {
 
         const program = new stopLang(instructions);
 
-        expect(() => program.execute()).toThrowError(SyntaxError);
+        expect(() => program.go()).toThrowError(SyntaxError);
     });
 
     it('must take a positive integral second argument', () => {

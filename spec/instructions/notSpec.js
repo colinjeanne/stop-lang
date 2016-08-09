@@ -3,7 +3,8 @@ const stopLang = require('../../umd/stop.js');
 describe('The NOT instruction', () => {
     const getResult = dataString => {
         const program = new stopLang([`NOT ${dataString}`]);
-        return program.execute();
+        program.go();
+        return program.currentResult;
     };
 
     it('can be empty', () => {

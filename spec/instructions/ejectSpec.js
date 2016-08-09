@@ -3,7 +3,8 @@ const stopLang = require('../../umd/stop.js');
 describe('The EJECT instruction', () => {
     const getResult = dataString => {
         const program = new stopLang([`EJECT ${dataString}`]);
-        return program.execute();
+        program.go();
+        return program.currentResult;
     };
 
     it('can be empty', () => {
@@ -14,7 +15,8 @@ describe('The EJECT instruction', () => {
         ];
 
         const program = new stopLang(instructions);
-        expect(program.execute()).toBe(2);
+        program.go();
+        expect(program.currentResult).toBe(2);
     });
 
     it('must be empty', () => {

@@ -3,7 +3,8 @@ const stopLang = require('../../umd/stop.js');
 describe('The LENGTH instruction', () => {
     const getResult = dataString => {
         const program = new stopLang([`LENGTH ${dataString}`]);
-        return program.execute();
+        program.go();
+        return program.currentResult;
     };
 
     it('cannot be empty', () => {
@@ -30,7 +31,7 @@ describe('The LENGTH instruction', () => {
 
         const program = new stopLang(instructions);
 
-        expect(() => program.execute()).toThrowError(SyntaxError);
+        expect(() => program.go()).toThrowError(SyntaxError);
     });
 
     it('can return the length of a list', () => {

@@ -3,7 +3,8 @@ const stopLang = require('../../umd/stop.js');
 describe('The ADD instruction', () => {
     const getResult = dataString => {
         const program = new stopLang([`ADD ${dataString}`]);
-        return program.execute();
+        program.go();
+        return program.currentResult;
     };
 
     it('cannot be empty', () => {

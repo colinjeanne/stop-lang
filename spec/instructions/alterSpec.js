@@ -8,7 +8,8 @@ describe('The ALTER instruction', () => {
         ];
 
         const program = new stopLang(instructions);
-        return program.execute();
+        program.go();
+        return program.currentResult;
     };
 
     it('cannot be empty', () => {
@@ -34,7 +35,8 @@ describe('The ALTER instruction', () => {
         ];
 
         const program = new stopLang(instructions);
-        expect(program.execute()).not.toBeDefined();
+        program.go();
+        expect(program.currentResult).not.toBeDefined();
     });
 
     it('can remove a label', () => {
@@ -46,7 +48,8 @@ describe('The ALTER instruction', () => {
         ];
 
         const program = new stopLang(instructions);
-        expect(program.execute()).not.toBeDefined();
+        program.go();
+        expect(program.currentResult).not.toBeDefined();
     });
 
     it('must take a string and an integer', () => {
@@ -68,7 +71,8 @@ describe('The ALTER instruction', () => {
             '(END) NOOP'
         ]);
 
-        expect(allBefore.execute()).not.toBeDefined();
+        allBefore.go();
+        expect(allBefore.currentResult).not.toBeDefined();
     });
 
     it('can move the label to a different instruction', () => {
@@ -79,7 +83,8 @@ describe('The ALTER instruction', () => {
             'NOOP'
         ]);
 
-        expect(allBefore.execute()).not.toBeDefined();
+        allBefore.go();
+        expect(allBefore.currentResult).not.toBeDefined();
     });
 
     it('alters the first label', () => {
@@ -96,6 +101,7 @@ describe('The ALTER instruction', () => {
             '(END) NOOP'
         ]);
 
-        expect(program.execute()).not.toBeDefined();
+        program.go();
+        expect(program.currentResult).not.toBeDefined();
     });
 });

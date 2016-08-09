@@ -22,9 +22,17 @@ import { isUndefined } from './types/undefined';
  */
 
 /**
- * Data output stream.
+ * Data output stream
  * @callback outputCallback
  * @param {string} data A STOP-parsable string.
+ */
+
+/**
+ * State change callback. Notifies callers about program state changes.
+ * @callback stateChangeCallback
+ * @param {ProgramState} newState The new state of the program.
+ * @param {ProgramState} oldState The old state of the program.
+ * @returns {boolean} Whether the program should pause
  */
 
 /**
@@ -958,28 +966,33 @@ export default class Program {
      * @param {inputCallback} stdin
      * @param {outputCallback} stdout
      * @param {outputCallback} stderr
+     * @param {stateChangeCallback} onStateChange
      */
     constructor(
         instructions = [],
-        stdin = () => {},
-        stdout = () => {},
-        stderr = () => {}) {
+        {
+            stdin = () => {},
+            stdout = () => {},
+            stderr = () => {},
+            onStateChange = () => {}
+        } = {}) {
         this.state = {
-            ip: 0,
-            instructions: instructions.map(parseInstruction),
-            evaluationStack: [],
             stdin,
             stdout,
             stderr
         };
+
+        this.onStateChange = onStateChange;
+        this.parsedInstructions = instructions.map(parseInstruction);
+        this.reset();
     }
 
     /**
-     * Executes the STOP program and returns the result of the final
-     * instruction
+     * Runs the STOP program until the state change callback requests the
+     * program to pause. Calling this method again will continue the execution.
      */
-    execute() {
-        while (this.state.ip < this.state.instructions.length) {
+    go() {
+        while (!this.isCompleted) {
             if (this.state.evaluationStack.length === 0) {
                 this.state.evaluationStack.push({
                     instruction: this.state.instructions[this.state.ip],
@@ -987,9 +1000,38 @@ export default class Program {
                 });
             }
 
-            this.state = advanceState(this.state);
-        }
+            const newState = advanceState(this.state);
+            const shouldPause = this.onStateChange(newState, this.state);
+            this.state = newState;
 
+            if (shouldPause) {
+                break;
+            }
+        }
+    }
+
+    /**
+     * Resets the program to its original state.
+     */
+    reset() {
+        this.state = Object.assign(
+            {},
+            this.state,
+            {
+                ip: 0,
+                instructions: this.parsedInstructions,
+                evaluationStack: [],
+                lastReturnedData: undefined
+            });
+
+        this.onStateChange(this.state, this.state);
+    }
+
+    get currentResult() {
         return this.state.lastReturnedData;
+    }
+
+    get isCompleted() {
+        return this.state.ip >= this.state.instructions.length;
     }
 }

@@ -11,7 +11,8 @@ describe('References', () => {
         ];
 
         const program = new stopLang(instructions);
-        expect(program.execute()).toBe(2);
+        program.go();
+        expect(program.currentResult).toBe(2);
     });
 
     it('can reference the current instruction pointer while handling a reference', () => {
@@ -22,7 +23,8 @@ describe('References', () => {
         ];
 
         const program = new stopLang(instructions);
-        expect(program.execute()).toBe(2);
+        program.go();
+        expect(program.currentResult).toBe(2);
     });
 
     it('can reference a value relative to the instruction pointer', () => {
@@ -31,14 +33,16 @@ describe('References', () => {
             'NOOP 1',
             'NOOP $ip+1'
         ]);
-        expect(forwardProgram.execute()).toBe(2);
+        forwardProgram.go();
+        expect(forwardProgram.currentResult).toBe(2);
 
         const reverseProgram = new stopLang([
             'NOOP 2',
             'NOOP 1',
             'NOOP $ip-1'
         ]);
-        expect(reverseProgram.execute()).toBe(1);
+        reverseProgram.go();
+        expect(reverseProgram.currentResult).toBe(1);
 
         const deepProgram = new stopLang([
             'NOOP 2',
@@ -46,7 +50,8 @@ describe('References', () => {
             'NOOP $ip-2',
             'NOOP $ip-1'
         ]);
-        expect(deepProgram.execute()).toBe(2);
+        deepProgram.go();
+        expect(deepProgram.currentResult).toBe(2);
     });
 
     it('can reference the location of the current instruction', () => {
@@ -57,7 +62,8 @@ describe('References', () => {
         ];
 
         const program = new stopLang(instructions);
-        expect(program.execute()).toBe(2);
+        program.go();
+        expect(program.currentResult).toBe(2);
     });
 
     it('can reference the location of the current instruction while handling a reference', () => {
@@ -68,7 +74,8 @@ describe('References', () => {
         ];
 
         const program = new stopLang(instructions);
-        expect(program.execute()).toBe(1);
+        program.go();
+        expect(program.currentResult).toBe(1);
     });
 
     it('can reference a value relative to the location of the current instruction', () => {
@@ -77,14 +84,16 @@ describe('References', () => {
             'NOOP 1',
             'NOOP $ci+1'
         ]);
-        expect(forwardProgram.execute()).toBe(3);
+        forwardProgram.go();
+        expect(forwardProgram.currentResult).toBe(3);
 
         const reverseProgram = new stopLang([
             'NOOP 2',
             'NOOP 1',
             'NOOP $ci-1'
         ]);
-        expect(reverseProgram.execute()).toBe(1);
+        reverseProgram.go();
+        expect(reverseProgram.currentResult).toBe(1);
 
         const deepProgram = new stopLang([
             'NOOP 2',
@@ -92,7 +101,8 @@ describe('References', () => {
             'NOOP $ci-1',
             'NOOP $ci-1'
         ]);
-        expect(deepProgram.execute()).toBe(2);
+        deepProgram.go();
+        expect(deepProgram.currentResult).toBe(2);
     });
 
     it('can reference the return value of another instruction', () => {
@@ -102,7 +112,8 @@ describe('References', () => {
         ];
 
         const program = new stopLang(instructions);
-        expect(program.execute()).toBe(3);
+        program.go();
+        expect(program.currentResult).toBe(3);
     });
 
     it('are calculated modulo the number of instructions', () => {
@@ -113,7 +124,8 @@ describe('References', () => {
         ];
 
         const program = new stopLang(instructions);
-        expect(program.execute()).toBe(1);
+        program.go();
+        expect(program.currentResult).toBe(1);
     });
 
     it('updates the set of instructions', () => {
@@ -126,7 +138,8 @@ describe('References', () => {
         ];
 
         const program = new stopLang(instructions);
-        expect(program.execute()).toBe(1);
+        program.go();
+        expect(program.currentResult).toBe(1);
     });
 
     it('can be a negative number', () => {
@@ -139,7 +152,8 @@ describe('References', () => {
         ];
 
         const program = new stopLang(instructions);
-        expect(program.execute()).toBe(3);
+        program.go();
+        expect(program.currentResult).toBe(3);
     });
 
     it('may reference labels', () => {
@@ -149,7 +163,8 @@ describe('References', () => {
         ];
 
         const program = new stopLang(instructions);
-        expect(program.execute()).toBe(3);
+        program.go();
+        expect(program.currentResult).toBe(3);
     });
 
     it('may be relative to labels', () => {
@@ -159,7 +174,8 @@ describe('References', () => {
             'NOOP 1',
             'NOOP $TEST+2',
         ]);
-        expect(forwardProgram.execute()).toBe(1);
+        forwardProgram.go();
+        expect(forwardProgram.currentResult).toBe(1);
 
         const reverseProgram = new stopLang([
             'NOOP 2',
@@ -167,7 +183,8 @@ describe('References', () => {
             '(TEST) NOOP 3',
             'NOOP $TEST-2',
         ]);
-        expect(reverseProgram.execute()).toBe(2);
+        reverseProgram.go();
+        expect(reverseProgram.currentResult).toBe(2);
     });
 
     it('label references must be upper case', () => {
@@ -185,7 +202,7 @@ describe('References', () => {
         ];
 
         const program = new stopLang(instructions);
-        expect(() => program.execute()).toThrowError(Error);
+        expect(() => program.go()).toThrowError(Error);
     });
 
     it('may be a double reference', () => {
@@ -195,7 +212,8 @@ describe('References', () => {
         ];
 
         const program = new stopLang(instructions);
-        expect(program.execute()).toBe('foo');
+        program.go();
+        expect(program.currentResult).toBe('foo');
     });
 
     it('can appear multiple times in instruction data', () => {
@@ -206,7 +224,8 @@ describe('References', () => {
         ];
 
         const program = new stopLang(instructions);
-        expect(program.execute()).toEqual([3, 2]);
+        program.go();
+        expect(program.currentResult).toEqual([3, 2]);
     });
 
     it('can reference instructions which themselves contain references', () => {
@@ -219,7 +238,8 @@ describe('References', () => {
         ];
 
         const program = new stopLang(instructions);
-        expect(program.execute()).toEqual([[3, 2], [2, 3], 2]);
+        program.go();
+        expect(program.currentResult).toEqual([[3, 2], [2, 3], 2]);
     });
 
     it('pass through stdin', () => {
@@ -229,8 +249,13 @@ describe('References', () => {
             '(FOO) NOOP $1',
         ];
 
-        const program = new stopLang(instructions, () => '"test"');
-        expect(program.execute()).toBe('test');
+        const program = new stopLang(
+            instructions,
+            {
+                stdin: () => '"test"'
+            });
+        program.go();
+        expect(program.currentResult).toBe('test');
     });
 
     it('pass through stdout', () => {
@@ -245,9 +270,11 @@ describe('References', () => {
 
         const program = new stopLang(
             instructions,
-            () => 'test',
-            stdout);
-        expect(program.execute()).not.toBeDefined();
+            {
+                stdout
+            });
+        program.go();
+        expect(program.currentResult).not.toBeDefined();
         expect(output).toBe('"bar"');
     });
 
@@ -263,10 +290,11 @@ describe('References', () => {
 
         const program = new stopLang(
             instructions,
-            () => 'test',
-            () => {},
-            stderr);
-        expect(program.execute()).not.toBeDefined();
+            {
+                stderr
+            });
+        program.go();
+        expect(program.currentResult).not.toBeDefined();
         expect(output).toBe('"bar"');
     });
 });

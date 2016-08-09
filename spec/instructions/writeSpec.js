@@ -6,9 +6,11 @@ describe('The WRITE instruction', () => {
     const getResult = (dataString, stdout) => {
         const program = new stopLang(
             [`WRITE ${dataString}`],
-            () => {},
-            stdout);
-        return program.execute();
+            {
+                stdout
+            });
+        program.go();
+        return program.currentResult;
     };
 
     it('can be empty', () => {

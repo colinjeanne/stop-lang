@@ -8,7 +8,8 @@ describe('The GOTO instruction', () => {
         ];
 
         const program = new stopLang(instructions);
-        return program.execute();
+        program.go();
+        return program.currentResult;
     };
 
     it('cannot be empty', () => {
@@ -47,7 +48,7 @@ describe('The GOTO instruction', () => {
 
         const badProgram = new stopLang(badInstructions);
 
-        expect(() => badProgram.execute()).toThrowError(SyntaxError);
+        expect(() => badProgram.go()).toThrowError(SyntaxError);
 
         expect(getResult('"FOO"', 'FOO')).not.toBeDefined();
     });
@@ -64,7 +65,8 @@ describe('The GOTO instruction', () => {
             '(END) NOOP'
         ]);
 
-        expect(program.execute()).not.toBeDefined();
+        program.go();
+        expect(program.currentResult).not.toBeDefined();
     });
 
     it('jumps if the conditional is 1', () => {
@@ -74,7 +76,8 @@ describe('The GOTO instruction', () => {
             '(GOOD) NOOP'
         ]);
 
-        expect(program.execute()).not.toBeDefined();
+        program.go();
+        expect(program.currentResult).not.toBeDefined();
     });
 
     it('does not jump if the conditional is 0', () => {
@@ -86,6 +89,7 @@ describe('The GOTO instruction', () => {
             '(GOOD) NOOP'
         ]);
 
-        expect(program.execute()).not.toBeDefined();
+        program.go();
+        expect(program.currentResult).not.toBeDefined();
     });
 });

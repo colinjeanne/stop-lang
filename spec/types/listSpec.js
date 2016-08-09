@@ -4,7 +4,8 @@ describe('Lists', () => {
     const getResult = dataString => {
         const instruction = `NOOP ${dataString}`;
         const program = new stopLang([instruction]);
-        return program.execute();
+        program.go();
+        return program.currentResult;
     };
 
     it('can be empty', () => {

@@ -3,7 +3,8 @@ const stopLang = require('../../umd/stop.js');
 describe('The AND instruction', () => {
     const getResult = dataString => {
         const program = new stopLang([`AND ${dataString}`]);
-        return program.execute();
+        program.go();
+        return program.currentResult;
     };
 
     it('can be empty', () => {
@@ -72,8 +73,9 @@ describe('The AND instruction', () => {
         ];
 
         const program = new stopLang(instructions);
+        program.go();
 
-        expect(program.execute()).toEqual([
+        expect(program.currentResult).toEqual([
             0,
             0,
             0,

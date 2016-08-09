@@ -3,7 +3,8 @@ const stopLang = require('../../umd/stop.js');
 describe('The LESS instruction', () => {
     const getResult = dataString => {
         const program = new stopLang([`LESS ${dataString}`]);
-        return program.execute();
+        program.go();
+        return program.currentResult;
     };
 
     it('cannot be empty', () => {
@@ -86,8 +87,9 @@ describe('The LESS instruction', () => {
         ];
 
         const program = new stopLang(instructions);
+        program.go();
 
-        expect(program.execute()).toEqual([
+        expect(program.currentResult).toEqual([
             0,
             0,
             0,

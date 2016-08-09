@@ -2,8 +2,13 @@ const stopLang = require('../../umd/stop.js');
 
 describe('The READ instruction', () => {
     const getResult = (dataString, stdin) => {
-        const program = new stopLang([`READ ${dataString}`], stdin);
-        return program.execute();
+        const program = new stopLang(
+            [`READ ${dataString}`],
+            {
+                stdin
+            });
+        program.go();
+        return program.currentResult;
     };
 
     it('can be empty', () => {

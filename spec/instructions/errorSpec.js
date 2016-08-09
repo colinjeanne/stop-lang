@@ -6,10 +6,11 @@ describe('The ERROR instruction', () => {
     const getResult = (dataString, stderr) => {
         const program = new stopLang(
             [`ERROR ${dataString}`],
-            () => {},
-            () => {},
-            stderr);
-        return program.execute();
+            {
+                stderr
+            });
+        program.go();
+        return program.currentResult;
     };
 
     it('can be empty', () => {

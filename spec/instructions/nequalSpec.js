@@ -3,7 +3,8 @@ const stopLang = require('../../umd/stop.js');
 describe('The NEQUAL instruction', () => {
     const getResult = dataString => {
         const program = new stopLang([`NEQUAL ${dataString}`]);
-        return program.execute();
+        program.go();
+        return program.currentResult;
     };
 
     it('cannot be empty', () => {
@@ -63,8 +64,9 @@ describe('The NEQUAL instruction', () => {
         ];
 
         const program = new stopLang(instructions);
+        program.go();
 
-        expect(program.execute()).toEqual([
+        expect(program.currentResult).toEqual([
             0,
             1,
             1,

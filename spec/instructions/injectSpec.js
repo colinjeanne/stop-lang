@@ -3,7 +3,8 @@ const stopLang = require('../../umd/stop.js');
 describe('The INJECT instruction', () => {
     const getResult = instructions => {
         const program = new stopLang(instructions);
-        return program.execute();
+        program.go();
+        return program.currentResult;
     };
 
     it('cannot be empty', () => {

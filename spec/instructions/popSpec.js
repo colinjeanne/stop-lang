@@ -3,7 +3,8 @@ const stopLang = require('../../umd/stop.js');
 describe('The POP instruction', () => {
     const getResult = dataString => {
         const program = new stopLang([`POP ${dataString}`]);
-        return program.execute();
+        program.go();
+        return program.currentResult;
     };
 
     it('can be empty', () => {
@@ -15,7 +16,8 @@ describe('The POP instruction', () => {
         ];
 
         const program = new stopLang(instructions);
-        expect(program.execute()).toBe(2);
+        program.go();
+        expect(program.currentResult).toBe(2);
     });
 
     it('must be empty', () => {
@@ -34,6 +36,7 @@ describe('The POP instruction', () => {
         ];
 
         const program = new stopLang(instructions);
-        expect(program.execute()).toEqual([2, 2, undefined, 1, 1]);
+        program.go();
+        expect(program.currentResult).toEqual([2, 2, undefined, 1, 1]);
     });
 });
