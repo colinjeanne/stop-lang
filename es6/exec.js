@@ -158,6 +158,23 @@ const findLabelIndex = (label, instructions) =>
         instruction.label === label);
 
 /**
+ * Builds an instruction string from instruction data
+ * @param {module:./parsing.ParsedInstruction[]} instruction
+ * @returns {string}
+ */
+const buildInstructionString = instruction => {
+    let s = '';
+
+    if (instruction.label) {
+        s += `(${instruction.label}) `;
+    }
+
+    s += `${instruction.name} ${Operations.valueToString(instruction.data)}`;
+
+    return s;
+};
+
+/**
  * Moves a label to a new location within the set of instructions
  * @type {StateTransition}
  */
@@ -180,6 +197,9 @@ const alter = argumentCount(2, 2)((state, instruction) => {
                 data: state.instructions[labelIp].data
             };
 
+            const removedFromString = buildInstructionString(removeFrom);
+            removeFrom.toString = () => removedFromString;
+
             newInstructions.splice(labelIp, 1, removeFrom);
         }
 
@@ -188,6 +208,9 @@ const alter = argumentCount(2, 2)((state, instruction) => {
             data: state.instructions[newLabelIp].data,
             label: instruction.data[0]
         };
+
+        const addToString = buildInstructionString(addTo);
+        addTo.toString = () => addToString;
 
         newInstructions.splice(newLabelIp, 1, addTo);
     }
