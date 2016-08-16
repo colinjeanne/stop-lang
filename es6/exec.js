@@ -944,8 +944,8 @@ const advanceState = state => {
             {
                 // The set of instructions may have been updated while
                 // processing this instruction, reset the instruction pointer
-                // to the current location of this instruction.
-                ip: updatedEvaluationItem.pointer,
+                // to the current location of the top-level instruction.
+                ip: updatedState.evaluationStack[0].pointer,
                 evaluationStack: [
                     ...updatedState.evaluationStack.slice(0, -1),
                     updatedEvaluationItem
