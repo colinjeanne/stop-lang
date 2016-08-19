@@ -149,13 +149,21 @@ const noop = disallowReferences((state, instruction) =>
 
 /**
  * Finds the first index of a label within the set of instructions
- * @param {string} label
+ * @param {string|number|undefined} label
  * @param {module:./parsing.ParsedInstruction[]} instructions
  * @returns {number}
  */
-const findLabelIndex = (label, instructions) =>
-    instructions.findIndex(instruction =>
-        instruction.label === label);
+const findLabelIndex = (label, instructions) => {
+    if (isString(label)) {
+        return instructions.findIndex(instruction =>
+            instruction.label === label);
+    } else if (isInteger(label)) {
+        const modded = label % instructions.length;
+        return modded < 0 ? modded + instructions.length : modded;
+    }
+
+    return -1;
+};
 
 /**
  * Builds an instruction string from instruction data
@@ -232,11 +240,11 @@ const alter = argumentCount(2, 2)((state, instruction) => {
 const gotoLabel = argumentCount(1, 2)((state, instruction) => {
     if (!(isList(instruction.data) &&
             (instruction.data.length === 2) &&
-            isString(instruction.data[0]) &&
+            (isString(instruction.data[0]) || isInteger(instruction.data[0])) &&
             ((instruction.data[1] === 0) || (instruction.data[1] === 1))) &&
-        !isString(instruction.data)) {
+        !(isString(instruction.data) || isInteger(instruction.data))) {
         throw new SyntaxError(
-            `GOTO must take a string and may take a condition ${instruction}`);
+            `GOTO must take a string or integer and may take a condition ${instruction}`);
     }
 
     let label;

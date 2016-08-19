@@ -36,20 +36,66 @@ describe('The GOTO instruction', () => {
         expect(() => getResult('"BAR"', 'FOO')).toThrowError(SyntaxError);
     });
 
-    it('must take a string', () => {
-        expect(() => getResult('1')).toThrowError(SyntaxError);
-        expect(() => getResult('[1]')).toThrowError(SyntaxError);
+    it('can take an integer', () => {
+        const instructions = [
+            'GOTO 2',
+            'ALTER ; Bad: we should skip this',
+            'NOOP 1',
+        ];
 
-        const badInstructions = [
+        const program = new stopLang(instructions);
+        program.go();
+        expect(program.currentResult).toBe(1);
+    });
+
+    it('considers integers modulo the number of instructions', () => {
+        const instructions = [
+            'GOTO -3',
             'NOOP',
-            'GOTO $0',
-            '(FOO) NOOP'
+            'GOTO 8',
+            'EJECT',
+            'ALTER ; Bad: we should skip this',
+        ];
+
+        const program = new stopLang(instructions);
+        program.go();
+        expect(program.currentResult).not.toBeDefined();
+    });
+
+    it('cannot take a floating point number', () => {
+        const badInstructions = [
+            'GOTO 1.1',
+            'NOOP'
         ];
 
         const badProgram = new stopLang(badInstructions);
 
         expect(() => badProgram.go()).toThrowError(SyntaxError);
+    });
 
+    it('cannot take a list', () => {
+        const badInstructions = [
+            'GOTO [1]',
+            'NOOP'
+        ];
+
+        const badProgram = new stopLang(badInstructions);
+
+        expect(() => badProgram.go()).toThrowError(SyntaxError);
+    });
+
+    it('cannot take UNDEFINED', () => {
+        const badInstructions = [
+            'GOTO UNDEFINED',
+            'NOOP'
+        ];
+
+        const badProgram = new stopLang(badInstructions);
+
+        expect(() => badProgram.go()).toThrowError(SyntaxError);
+    });
+
+    it('can take a string', () => {
         expect(getResult('"FOO"', 'FOO')).not.toBeDefined();
     });
 

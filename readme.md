@@ -305,9 +305,11 @@ STOP and outputs them as a single line to standard error.
 ### GOTO string [condition]
 The `GOTO` command moves the instruction pointer to the first label with the
 given name in the list of commands if an optional condition is truthy. The
-command takes a string for the label's name. If the condition is not provided
-then it is assumed to be truthy. If the condition is falsey then this command
-does not move the instruction pointer.
+command takes a string for the label's name or, alternatively, an integral
+index of the instruction to jump to. Indices are considered modulo the number
+of commands so that `-1` represents the last command. If the condition is not
+provided then it is assumed to be truthy. If the condition is falsey then this
+command does not move the instruction pointer.
 
 This command returns `UNDEFINED`.
 
