@@ -136,3 +136,11 @@ export const isInstructionPointerReference = v =>
  */
 export const isInstructionLocationReference = v =>
     isDirectReference(v) && (v.base === 'ci') && (v.offset === 0);
+
+/**
+ * Whether the reference is for the next value on standard input
+ * @param {*} value
+ * @returns {boolean}
+ */
+export const isStandardInputReference = v =>
+    isDirectReference(v) && (v.base === 'stdin') && (v.offset === 0);

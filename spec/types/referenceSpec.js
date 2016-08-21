@@ -242,11 +242,9 @@ describe('References', () => {
         expect(program.currentResult).toEqual([[3, 2], [2, 3], 2]);
     });
 
-    it('pass through stdin', () => {
+    it('can refer to stdin', () => {
         const instructions = [
-            'GOTO "FOO"',
-            'READ',
-            '(FOO) NOOP $1',
+            'NOOP $stdin',
         ];
 
         const program = new stopLang(
@@ -296,5 +294,51 @@ describe('References', () => {
         program.go();
         expect(program.currentResult).not.toBeDefined();
         expect(output).toBe('"bar"');
+    });
+
+    describe('The $stdin reference', () => {
+        const getResult = stdin => {
+            const program = new stopLang(
+                ['NOOP $stdin'],
+                {
+                    stdin
+                });
+            program.go();
+            return program.currentResult;
+        };
+
+        it('cannot read references', () => {
+            const stdin = () => '$1';
+            expect(() => getResult(stdin)).toThrowError(SyntaxError);
+        });
+
+        it('cannot read malformed data', () => {
+            const stdin = () => 'foo';
+            expect(() => getResult(stdin)).toThrowError(SyntaxError);
+        });
+
+        it('can read undefined', () => {
+            expect(getResult(() => 'UNDEFINED')).not.toBeDefined();
+        });
+
+        it('can read numbers', () => {
+            expect(getResult(() => '1')).toBe(1);
+            expect(getResult(() => '-1')).toBe(-1);
+            expect(getResult(() => '1.25')).toBe(1.25);
+            expect(getResult(() => '1e2')).toBe(100);
+        });
+
+        it('can read strings', () => {
+            expect(getResult(() => '""')).toBe('');
+            expect(getResult(() => '"foo"')).toBe('foo');
+        });
+
+        it('can read lists', () => {
+            expect(getResult(() => '[1,2]')).toEqual([1,2]);
+            expect(getResult(() => '1 2')).toEqual([1,2]);
+            expect(getResult(() => '[]')).toEqual([]);
+            expect(getResult(() => '[1]')).toEqual([1]);
+            expect(getResult(() => '[[1], 2]')).toEqual([[1], 2]);
+        });
     });
 });

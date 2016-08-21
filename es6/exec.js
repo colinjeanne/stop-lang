@@ -11,7 +11,8 @@ import {
     isDirectReference,
     isInstructionLocationReference,
     isInstructionPointerReference,
-    isReference } from './types/reference';
+    isReference,
+    isStandardInputReference } from './types/reference';
 import { isString } from './types/string';
 import { isUndefined } from './types/undefined';
 
@@ -195,7 +196,7 @@ const alter = argumentCount(2, 2)((state, instruction) => {
     }
 
     const labelIp = findLabelIndex(instruction.data[0], state.instructions);
-    const newLabelIp = instruction.data[1] % state.instructions.length;
+    const newLabelIp = findLabelIndex(instruction.data[1], state.instructions);
     let newInstructions = [...state.instructions];
 
     if (labelIp !== newLabelIp) {
@@ -664,28 +665,6 @@ const item = argumentCount(2, 2)(disallowReferences((state, instruction) => {
 }));
 
 /**
- * Returns a line from standard input
- * @type {StateTransition}
- */
-const readInput = argumentCount(0, 0)(disallowReferences(state => {
-    const line = state.stdin();
-    const virtualInstruction = `NOOP ${line}`;
-    const parsed = parseInstruction(virtualInstruction);
-
-    if (hasReferences(parsed.data)) {
-        throw new Error('READ cannot read references');
-    }
-
-    return Object.assign(
-        {},
-        state,
-        {
-            ip: state.ip + 1,
-            lastReturnedData: parsed.data
-        });
-}));
-
-/**
  * Writes a line to standard output
  * @type {StateTransition}
  */
@@ -730,7 +709,6 @@ const knownInstructions = new Map([
     ['EQUAL', equal],
     ['GOTO', gotoLabel],
     ['INJECT', inject],
-    ['READ', readInput],
     ['ITEM', item],
     ['LENGTH', dataLength],
     ['LESS', less],
@@ -789,6 +767,22 @@ const decayIndirectReferences = data => {
 };
 
 /**
+ * Decays a reference to standard input
+ * @returns {*}
+ */
+const decayStandardInputReference = state => {
+    const line = state.stdin();
+    const virtualInstruction = `NOOP ${line}`;
+    const parsed = parseInstruction(virtualInstruction);
+
+    if (hasReferences(parsed.data)) {
+        throw new SyntaxError('$stdin cannot read references');
+    }
+
+    return parsed.data;
+};
+
+/**
  * Decays an instruction pointer reference if possible
  * @param {ProgramState} state The current program state
  * @param {*} data The data which may contain a reference
@@ -797,10 +791,11 @@ const decayIndirectReferences = data => {
 const decayInstructionPointerReference = (state, data) => {
     if (isInstructionPointerReference(data)) {
         return state.ip;
-    }
-    else if (isInstructionLocationReference(data)) {
+    } else if (isInstructionLocationReference(data)) {
         const lastIndex = state.evaluationStack.length - 1;
         return state.evaluationStack[lastIndex].pointer;
+    } else if (isStandardInputReference(data)) {
+        return decayStandardInputReference(state);
     }
 
     return data;
@@ -819,7 +814,8 @@ const decayKnownInstructionPointerReferences = (state, data) => {
         return data.map(datum => {
             if (isDirectReference(datum) &&
                 !isInstructionPointerReference(datum) &&
-                !isInstructionLocationReference(datum)) {
+                !isInstructionLocationReference(datum) &&
+                !isStandardInputReference(datum)) {
                 hasSeenDirectReference = true;
             }
 

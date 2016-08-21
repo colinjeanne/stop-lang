@@ -104,4 +104,16 @@ describe('The ALTER instruction', () => {
         program.go();
         expect(program.currentResult).not.toBeDefined();
     });
+
+    it('interprets the index MOD the number of commands', () => {
+        const program = new stopLang([
+            'ALTER "TEST" -1',
+            'GOTO "TEST"',
+            '(TEST) GOTO ; Bad: we should skip this',
+            'NOOP'
+        ]);
+
+        program.go();
+        expect(program.currentResult).not.toBeDefined();
+    });
 });

@@ -200,6 +200,11 @@ relative references. They are:
 * `$ci+0`: The position of the current command in the set of commands
 * `$ci-0`: The position of the current command in the set of commands
 
+### Standard input
+References pull data from one location to the current command but sometimes
+data from outside the program is needed. The `$stdin` reference reads STOP
+values from the standard input stream. It is always an absolute reference.
+
 ### Truthiness
 An explicit Boolean data type is unnecessary in STOP because of the existence
 of truthiness. A value is truthy if it is non-empty. If it is empty then it is
@@ -306,7 +311,7 @@ STOP and outputs them as a single line to standard error.
 The `GOTO` command moves the instruction pointer to the first label with the
 given name in the list of commands if an optional condition is truthy. The
 command takes a string for the label's name or, alternatively, an integral
-index of the instruction to jump to. Indices are considered modulo the number
+index of the instruction to jump to. Indices are interpreted MOD the number
 of commands so that `-1` represents the last command. If the condition is not
 provided then it is assumed to be truthy. If the condition is falsey then this
 command does not move the instruction pointer.
@@ -453,12 +458,6 @@ the set of commands.
 Indirect references in the set of values decay into direct references.
 
     PUSH "GOTO" "test" ; Inserts the command GOTO "test" as the first command
-
-### READ
-The `READ` command reads a single line from standard input and returns the
-data as interpreted as STOP values. The command takes not arguments.
-
-    READ ; Reads a line from standard input
 
 ### SUB value1 value2 [...valueN]
 The `SUB` command requires at least two values and will subtract them from one

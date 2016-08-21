@@ -196,6 +196,11 @@ const extractReference = (instruction, s) => {
         }
     }
 
+    if (rest === 'stdin') {
+        // This references the next data available from the input stream
+        value = new Reference(rest, 0, isIndirect);
+    }
+
     if (!value) {
         throw new SyntaxError(
             `Invalid reference line in instruction ${instruction}`);
