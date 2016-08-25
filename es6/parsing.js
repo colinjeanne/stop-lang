@@ -220,7 +220,7 @@ const extractItem = (instruction, s) => {
     let value = undefined;
 
     // Remove leading spaces
-    let firstNonspaceIndex = s.search('[^ ]');
+    const firstNonspaceIndex = s.search('[^ ]');
     if (firstNonspaceIndex !== -1) {
         const trimmed = s.substr(firstNonspaceIndex);
         switch (s[firstNonspaceIndex]) {
@@ -249,8 +249,13 @@ const extractItem = (instruction, s) => {
         }
 
         // Remove trailing spaces
-        if ((endIndex !== -1) && (s[endIndex] == ' ')) {
-            endIndex += s.substr(endIndex).search('[^ ]');
+        if ((endIndex !== -1) && (s[endIndex] === ' ')) {
+            // If the instruction ends with whitespace then there wont be a
+            // next non-space character
+            const nextNonSpaceIndex = s.substr(endIndex).search('[^ ]');
+            if (nextNonSpaceIndex !== -1) {
+                endIndex += nextNonSpaceIndex;
+            }
         }
 
         endIndex += firstNonspaceIndex;
@@ -273,7 +278,7 @@ const parseDataAndComment = (instruction, dataAndComment) => {
         const c = dataAndComment[i];
         if (c === ';') {
             break;
-        } else {
+        } else if (c !== ' ') {
             ({endIndex, value} =
                 extractItem(instruction, dataAndComment.substr(i)));
             data.push(value);
