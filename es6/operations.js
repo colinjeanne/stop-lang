@@ -248,6 +248,19 @@ export const or = (u, v) => {
 };
 
 /**
+ * Floors a value numerically
+ *
+ * If the value is not a numeric value then the result is NAN. Otherwise the
+ * return is the nearest integer which is less than the value.
+ *
+ * @param {*} u
+ * @return {number}
+ */
+export const floor = u => {
+    return Math.floor(u);
+};
+
+/**
  * Returns whether one value is less than another
  *
  * If both values are numbers then they are compared numerically.

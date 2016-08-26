@@ -498,6 +498,19 @@ const mod = argumentCount(2)(disallowReferences((state, instruction) =>
         })));
 
 /**
+ * Performs the floor operation against a value
+ * @type {StateTransition}
+ */
+const floor = disallowReferences((state, instruction) =>
+    Object.assign(
+        {},
+        state,
+        {
+            ip: state.ip + 1,
+            lastReturnedData: Operations.floor(instruction.data)
+        }));
+
+/**
  * Bitwise ANDs values or finds the intersection of lists
  * @type {StateTransition}
  */
@@ -736,6 +749,7 @@ const knownInstructions = new Map([
     ['EJECT', eject],
     ['ERROR', errorOutput],
     ['EQUAL', equal],
+    ['FLOOR', floor],
     ['GOTO', gotoLabel],
     ['INJECT', inject],
     ['ITEM', item],

@@ -307,6 +307,12 @@ STOP and outputs them as a single line to standard error.
 
     ERROR "Oh" "teh" "noes" ; Outputs '["Oh", "teh", "noes"]'
 
+### FLOOR value
+The `FLOOR` command performs returns the nearest integer less than the given
+value. Non-numeric values are treated as `NAN`.
+
+    FLOOR 3.2 ; Returns 3
+
 ### GOTO string [condition]
 The `GOTO` command moves the instruction pointer to the first label with the
 given name in the list of commands if an optional condition is truthy. The
