@@ -621,6 +621,35 @@ const less = argumentCount(2)(disallowReferences((state, instruction) => {
 }));
 
 /**
+ * Performs the shift operation on the values
+ * @type {StateTransition}
+ */
+const shift = disallowReferences((state, instruction) => {
+    let data;
+    let amount;
+    if (isList(instruction.data) && (instruction.data.length === 2)) {
+        data = instruction.data[0];
+        amount = instruction.data[1];
+
+        if (!isInteger(amount)) {
+            throw new SyntaxError(
+                `SHIFT amount must be an integer ${instruction}`);
+        }
+    } else {
+        data = instruction.data;
+        amount = 1;
+    }
+
+    return Object.assign(
+        {},
+        state,
+        {
+            ip: state.ip + 1,
+            lastReturnedData: Operations.shift(data, amount)
+        });
+});
+
+/**
  * Returns the length of a list or string
  * @type {StateTransition}
  */
@@ -720,6 +749,7 @@ const knownInstructions = new Map([
     ['OR', or],
     ['POP', pop],
     ['PUSH', push],
+    ['SHIFT', shift],
     ['SUB', subtract],
     ['WRITE', writeOutput]
 ]);

@@ -459,6 +459,18 @@ Indirect references in the set of values decay into direct references.
 
     PUSH "GOTO" "test" ; Inserts the command GOTO "test" as the first command
 
+### SHIFT value [amount]
+The `SHIFT` command takes a value and optionally an integer amount to shift by,
+defaulting to `1`. Positive amounts shift the value to the left and negative
+shift the value to the right. Lists and strings are shifted by rotating the
+items or characters by the given amount. `UNDEFINED` and non-finite numbers
+always shift to themselves. Finite numbers are treated as 32-bit two's
+complement numbers and are shifted bitwise. Right shifts preserve sign.
+
+    SHIFT 1 2 ; Returns 4
+    SHIFT 2 -1 ; Returns 1
+    SHIFT "test" ; Returns "estt"
+
 ### SUB value1 value2 [...valueN]
 The `SUB` command requires at least two values and will subtract them from one
 another with subtraction being defined depending on the types of the values.

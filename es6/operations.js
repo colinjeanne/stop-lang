@@ -40,7 +40,7 @@ export const areEqual = (u, v) => {
  *
  * @param {*} u
  * @param {*} v
- * @return {boolean}
+ * @return {*}
  */
 export const add = (u, v) => {
     if (isList(u)) {
@@ -72,7 +72,7 @@ export const add = (u, v) => {
  *
  * @param {*} u
  * @param {*} v
- * @return {boolean}
+ * @return {*}
  */
 export const subtract = (u, v) => {
     if (isUndefined(u) || isUndefined(v)) {
@@ -104,7 +104,7 @@ export const subtract = (u, v) => {
  *
  * @param {*} u
  * @param {*} v
- * @return {boolean}
+ * @return {*}
  */
 export const multiply = (u, v) => {
     if (isUndefined(u) || isUndefined(v)) {
@@ -135,7 +135,7 @@ export const multiply = (u, v) => {
  *
  * @param {*} u
  * @param {*} v
- * @return {boolean}
+ * @return {*}
  */
 export const divide = (u, v) => {
     if (isUndefined(u) || isUndefined(v)) {
@@ -154,7 +154,7 @@ export const divide = (u, v) => {
  *
  * @param {*} u
  * @param {*} v
- * @return {boolean}
+ * @return {*}
  */
 export const mod = (u, v) => {
     if (isUndefined(u) || isUndefined(v)) {
@@ -209,7 +209,7 @@ export const falsey = u => {
  *
  * @param {*} u
  * @param {*} v
- * @return {boolean}
+ * @return {*}
  */
 export const and = (u, v) => {
     if (isList(u) && isList(v)) {
@@ -232,7 +232,7 @@ export const and = (u, v) => {
  *
  * @param {*} u
  * @param {*} v
- * @return {boolean}
+ * @return {*}
  */
 export const or = (u, v) => {
     if (isList(u) && isList(v)) {
@@ -265,6 +265,67 @@ export const less = (u, v) => {
     }
 
     return 0;
+};
+
+/**
+ * Returns the type shifted by some value
+ *
+ * UNDEFINED, NAN, and INFINITY always return themselves.
+ * Strings and lists are rotated element-wise.
+ * Finite numbers are shifted bitwise such that positive amounts are left
+ * shifts and negative amounts are right shifts. Right shifts preserve sign.
+ * Numbers are treated as signed 32 bit numbers in two's complement format.
+ *
+ * @param {*} u
+ * @param {number} v
+ * @return {*}
+ */
+export const shift = (u, amount) => {
+    if (isUndefined(u)) {
+        return undefined;
+    } else if (isString(u) || isList(u)) {
+        if (u.length === 0) {
+            return u;
+        }
+
+        const moddedAmount = amount % u.length;
+        const shiftAmount = moddedAmount < 0 ?
+            moddedAmount + u.length :
+            moddedAmount;
+
+        if (isString(u)) {
+            return u.slice(shiftAmount) + u.slice(0, shiftAmount);
+        } else {
+            return [
+                ...u.slice(shiftAmount),
+                ...u.slice(0, shiftAmount)
+            ];
+        }
+    } else if (isNaN(u)) {
+        return NaN;
+    } else if (!isFinite(u)) {
+        return u;
+    }
+
+    if (amount >= 0) {
+        if (amount >= 32) {
+            // The number is treated as 32 bits and at or beyond a shift of 32
+            // bits all bits would have been discarded.
+            return 0;
+        }
+        return u << amount;
+    }
+
+    if (amount <= -32) {
+        if (u < 0) {
+            // The number is treated as 32 bits and at or beyond a shift of 32
+            // bits the sign bit would have been filled to every bit.
+            return -1;
+        }
+
+        return 0;
+    }
+    return u >> -amount;
 };
 
 /**
