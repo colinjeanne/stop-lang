@@ -15,4 +15,9 @@ describe('Undefined', () => {
     it('can explicitly created', () => {
         expect(getResult('UNDEFINED')).not.toBeDefined();
     });
+
+    it('can be in a list', () => {
+        expect(getResult('[UNDEFINED, UNDEFINED]')).
+            toEqual([undefined, undefined]);
+    });
 });

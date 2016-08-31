@@ -51,4 +51,9 @@ describe('Numbers', () => {
     it('can read NAN', () => {
         expect(getResult('NAN')).toEqual(NaN);
     });
+
+    it('can be in a list', () => {
+        expect(getResult('[1, 2, 3e2, NAN, NAN , INFINITY ,INFINITY]')).
+            toEqual([1, 2, 300, NaN, NaN, Infinity, Infinity]);
+    });
 });

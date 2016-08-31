@@ -9,23 +9,27 @@ const getResult = dataString => {
 
 describe('Quoted strings', () => {
     it('can be empty', () => {
-        expect(getResult('""')).toEqual('');
+        expect(getResult('""')).toBe('');
     });
 
     it('can a simple string', () => {
-        expect(getResult('"foo"')).toEqual('foo');
+        expect(getResult('"foo"')).toBe('foo');
     });
 
     it('can have escaped quotes', () => {
-        expect(getResult('"foo \\"bar\\""')).toEqual('foo "bar"');
+        expect(getResult('"foo \\"bar\\""')).toBe('foo "bar"');
     });
 
     it('can have escaped backslashes', () => {
-        expect(getResult('"foo \\\\bar\\\\"')).toEqual('foo \\bar\\');
+        expect(getResult('"foo \\\\bar\\\\"')).toBe('foo \\bar\\');
     });
 
     it('can have semicolons', () => {
-        expect(getResult('"foo ; bar"')).toEqual('foo ; bar');
+        expect(getResult('"foo ; bar"')).toBe('foo ; bar');
+    });
+
+    it('can be in a list', () => {
+        expect(getResult('["foo", "bar"]')).toEqual(['foo', 'bar']);
     });
 
     it('throws on unknown escaped characters', () => {

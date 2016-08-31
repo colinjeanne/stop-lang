@@ -31,9 +31,10 @@ const extractUndefined = (instruction, s) => {
  * Extracts a number from the instruction data string
  * @param {string} instruction The complete instruction
  * @param {string} s The substring from which to extract the number
+ * @param {string} delimiters A string container the delimiters between each term
  * @returns {ExtractionResult}
  */
-const extractNumber = (instruction, s) => {
+const extractNumber = (instruction, s, delimiters) => {
     const decimal = '(-|\\+)?((\\d+)(\\.\\d+)?|(\\d*)\\.\\d+)';
     const fullNumber = `^${decimal}((e|E)(-|\\+)?(\\d+))?`;
 
@@ -43,14 +44,15 @@ const extractNumber = (instruction, s) => {
         return {endIndex: numberMatches[0].length, value};
     }
 
-    const infinityRegex = /^(-|\+)?INFINITY( |$)/;
+    const infinityRegex = new RegExp(`^(-|\\+)?INFINITY([${delimiters}]|$)`);
     const infinityMatches = infinityRegex.exec(s);
     if (infinityMatches) {
+        const signLength = infinityMatches[1] ? 1 : 0;
         const value = infinityMatches[1] === '-' ? -Infinity : Infinity;
-        return {endIndex: infinityMatches[0].length, value};
+        return {endIndex: signLength + 'INFINITY'.length, value};
     }
 
-    const nanRegex = /^NAN( |$)/;
+    const nanRegex =  new RegExp(`^NAN([${delimiters}]|$)`);
     const nanMatches = nanRegex.exec(s);
     if (nanMatches) {
         return {endIndex: 'NAN'.length, value: NaN};
@@ -125,7 +127,7 @@ const extractList = (instruction, s) => {
             }
 
             ({endIndex, value: itemValue} =
-                extractItem(instruction, s.substr(i)));
+                extractItem(instruction, s.substr(i), ' ,\\]'));
             value.push(itemValue);
             i += endIndex - 1;
             elementHasValue = true;
@@ -155,13 +157,14 @@ const extractList = (instruction, s) => {
  * Extracts a reference from the instruction data string
  * @param {string} instruction The complete instruction
  * @param {string} s The substring from which to extract the reference
+ * @param {string} delimiters A string container the delimiters between each term
  * @returns {ExtractionResult}
  */
-const extractReference = (instruction, s) => {
+const extractReference = (instruction, s, delimiters) => {
     const isIndirect = s.startsWith('$$');
     const startIndex = isIndirect ? 2 : 1;
-    const spaceIndex = s.indexOf(' ');
-    const endIndex = spaceIndex === -1 ? s.length : spaceIndex;
+    const delimiterIndex = s.search(`[${delimiters}]`);
+    const endIndex = delimiterIndex === -1 ? s.length : delimiterIndex;
     const rest = s.substring(startIndex, endIndex);
 
     let value = null;
@@ -213,9 +216,10 @@ const extractReference = (instruction, s) => {
  * Extracts a STOP type from the instruction data string
  * @param {string} instruction The complete instruction
  * @param {string} s The substring from which to extract the type
+ * @param {string} delimiters A string container the delimiters between each term
  * @returns {ExtractionResult}
  */
-const extractItem = (instruction, s) => {
+const extractItem = (instruction, s, delimiters) => {
     let endIndex = s.length;
     let value = undefined;
 
@@ -233,7 +237,10 @@ const extractItem = (instruction, s) => {
             break;
 
         case '$':
-            ({endIndex, value} = extractReference(instruction, trimmed));
+            ({endIndex, value} = extractReference(
+                instruction,
+                trimmed,
+                delimiters));
             break;
 
         case 'U':
@@ -244,7 +251,10 @@ const extractItem = (instruction, s) => {
             throw new SyntaxError(`Unexpected comment in ${instruction}`);
 
         default:
-            ({endIndex, value} = extractNumber(instruction, trimmed));
+            ({endIndex, value} = extractNumber(
+                instruction,
+                trimmed,
+                delimiters));
             break;
         }
 
@@ -280,7 +290,7 @@ const parseDataAndComment = (instruction, dataAndComment) => {
             break;
         } else if (c !== ' ') {
             ({endIndex, value} =
-                extractItem(instruction, dataAndComment.substr(i)));
+                extractItem(instruction, dataAndComment.substr(i), ' '));
             data.push(value);
             i += endIndex - 1;
         }

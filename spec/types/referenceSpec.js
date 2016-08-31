@@ -242,6 +242,18 @@ describe('References', () => {
         expect(program.currentResult).toEqual([[3, 2], [2, 3], 2]);
     });
 
+    it('can be in a list', () => {
+        const instructions = [
+            'NOOP [$ip,$ip-0]',
+            'NOOP [$ip , $ip-0 ]',
+            'NOOP $0 $1'
+        ];
+
+        const program = new stopLang(instructions);
+        program.go();
+        expect(program.currentResult).toEqual([[2, 2], [2, 2]]);
+    });
+
     it('can refer to stdin', () => {
         const instructions = [
             'NOOP $stdin',
