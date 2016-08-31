@@ -178,7 +178,7 @@ const buildInstructionString = instruction => {
         s += `(${instruction.label}) `;
     }
 
-    s += `${instruction.name} ${Operations.valueToString(instruction.data)}`;
+    s += `${instruction.name} ${Operations.asInstructionString(instruction.data)}`;
 
     return s;
 };
@@ -294,7 +294,7 @@ const push = argumentCount(1)((state, instruction) => {
             instruction.data[0],
             ...instruction.data.
                 slice(1).
-                map(Operations.valueToString)
+                map(Operations.asInstructionString)
         ].join(' ');
 
         newInstruction = parseInstruction(instructionString);
@@ -380,7 +380,7 @@ const inject = argumentCount(1)((state, instruction) => {
             instruction.data[0],
             ...instruction.data.
                 slice(1).
-                map(Operations.valueToString)
+                map(Operations.asInstructionString)
         ].join(' ');
 
         newInstruction = parseInstruction(instructionString);
@@ -711,7 +711,7 @@ const item = argumentCount(2, 2)(disallowReferences((state, instruction) => {
  * @type {StateTransition}
  */
 const writeOutput = disallowReferences((state, instruction) => {
-    state.stdout(Operations.valueToString(instruction.data));
+    state.stdout(Operations.asOutputString(instruction.data));
 
     return Object.assign(
         {},
@@ -727,7 +727,7 @@ const writeOutput = disallowReferences((state, instruction) => {
  * @type {StateTransition}
  */
 const errorOutput = disallowReferences((state, instruction) => {
-    state.stderr(Operations.valueToString(instruction.data));
+    state.stderr(Operations.asOutputString(instruction.data));
 
     return Object.assign(
         {},
@@ -739,12 +739,40 @@ const errorOutput = disallowReferences((state, instruction) => {
 });
 
 /**
+ * Casts the instruction data to a number
+ * @type {StateTransition}
+ */
+const asNumber = disallowReferences((state, instruction) =>
+    Object.assign(
+        {},
+        state,
+        {
+            ip: state.ip + 1,
+            lastReturnedData: Operations.asNumber(instruction.data)
+        }));
+
+/**
+ * Casts the instruction data to a string
+ * @type {StateTransition}
+ */
+const asString = disallowReferences((state, instruction) =>
+    Object.assign(
+        {},
+        state,
+        {
+            ip: state.ip + 1,
+            lastReturnedData: Operations.asString(instruction.data)
+        }));
+
+/**
  * A mapping between instruction names and instruction handlers
  */
 const knownInstructions = new Map([
     ['ADD', add],
     ['ALTER', alter],
     ['AND', and],
+    ['ASNUMBER', asNumber],
+    ['ASSTRING', asString],
     ['DIV', divide],
     ['EJECT', eject],
     ['ERROR', errorOutput],

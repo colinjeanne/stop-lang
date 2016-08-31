@@ -274,6 +274,23 @@ Otherwise the operation returns 1 if all values are truthy and 0 otherwise.
 
     AND 5 3 ; Returns 1
 
+### ASNUMBER [value]
+The `ASNUMBER` command casts its argument to a number if it is not already a
+number.
+
+If the value is missing, `UNDEFINED`, or a list then the result is `NAN`.
+
+If the value is a string and that string is parsable as a STOP number then the
+result is the parsed number.
+
+    ASNUMBER "123" ; Returns 123
+
+### ASSTRING [value]
+The `ASSTING` command casts its argument to a string if it is not already a
+string.
+
+    ASSTRING 123 ; Returns "123"
+
 ### DIV value1 value2 [...valueN]
 The `DIV` command requires at least two values and will divide with division
 being defined depending on the types of the values. Values are divided left to

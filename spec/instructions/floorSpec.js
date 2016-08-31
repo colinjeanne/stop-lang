@@ -27,7 +27,8 @@ describe('The FLOOR instruction', () => {
 
     it('can floor INFINITY', () => {
         expect(getResult('INFINITY')).toBe(Infinity);
-        expect(getResult('-INFINITY')).toEqual(-Infinity);
+        expect(getResult('+INFINITY')).toBe(+Infinity);
+        expect(getResult('-INFINITY')).toBe(-Infinity);
     });
 
     it('can floor a list', () => {

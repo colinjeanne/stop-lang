@@ -55,7 +55,7 @@ export const add = (u, v) => {
         } else if (isUndefined(u) || isUndefined(v)) {
             return undefined;
         } else if (!isNumber(u) && !isNumber(v)) {
-            return castToString(u) + castToString(v);
+            return asString(u) + asString(v);
         }
         return u + v;
     }
@@ -342,22 +342,31 @@ export const shift = (u, amount) => {
 };
 
 /**
- * Casts a STOP type to a STOP string type
+ * Converts a STOP value to a STOP-parsable string suitable to use in a STOP
+ * instruction
  * @param {*} value
  * @returns {string}
  */
-export const castToString = v => {
+export const asInstructionString = v => {
     let s = '';
     if (isUndefined(v)) {
-        s = '';
+        s = 'UNDEFINED';
     } else if (isString(v)) {
-        s = v;
+        s = '"' + v.replace('\\', '\\\\').replace('\"', '\\"') + '"';
     } else if (isNumber(v)) {
-        s = v.toString();
+        if (Number.isNaN(v)) {
+            s = 'NAN';
+        } else if (v === Infinity) {
+            s = 'INFINITY';
+        } else if (v === -Infinity) {
+            s = '-INFINITY';
+        } else {
+            s = v.toString();
+        }
     } else if (isReference(v)) {
         s = v.toString();
     } else if (isList(v)) {
-        s = '[' + v.map(valueToString).join(', ') + ']';
+        s = '[' + v.map(asInstructionString).join(', ') + ']';
     }
 
     return s;
@@ -368,18 +377,38 @@ export const castToString = v => {
  * @param {*} value
  * @returns {string}
  */
-export const valueToString = v => {
-    let s = '';
+export const asString = v => isString(v) ? v : asInstructionString(v);
+
+/**
+ * Converts a STOP value to a STOP-parsable string suitable to pass to an
+ * output stream
+ * @param {*} value
+ * @returns {string}
+ */
+export const asOutputString = v =>
+    isUndefined(v) ? '' : asInstructionString(v);
+
+/**
+ * Converts a STOP value to a STOP-parsable number
+ * @param {*} value
+ * @returns {string}
+ */
+export const asNumber = v => {
+    let s = NaN;
     if (isUndefined(v)) {
-        s = '';
+        s = NaN;
     } else if (isString(v)) {
-        s = '"' + v.replace('\\', '\\\\').replace('\"', '\\"') + '"';
+        if ((v === 'INFINITY') || (v === '+INFINITY')) {
+            s = Infinity;
+        } else if (v === '-INFINITY') {
+            s = -Infinity;
+        } else if (v === 'NAN') {
+            s = NaN;
+        } else {
+            s = Number.parseFloat(v);
+        }
     } else if (isNumber(v)) {
-        s = v.toString();
-    } else if (isReference(v)) {
-        s = v.toString();
-    } else if (isList(v)) {
-        s = '[' + v.map(valueToString).join(', ') + ']';
+        s = v;
     }
 
     return s;
