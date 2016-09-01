@@ -12,6 +12,7 @@ import {
     isInstructionLocationReference,
     isInstructionPointerReference,
     isReference,
+    isSpecialDirectReference,
     isStandardInputReference } from './types/reference';
 import { isString } from './types/string';
 import { isUndefined } from './types/undefined';
@@ -80,6 +81,19 @@ const hasDirectReferences = data => {
     }
 
     return isDirectReference(data);
+};
+
+/**
+ * Whether the data has any direct references
+ * @param {*} data
+ * @returns {boolean}
+ */
+const hasNonSpecialDirectReferences = data => {
+    if (isList(data)) {
+        return data.some(hasNonSpecialDirectReferences);
+    }
+
+    return isDirectReference(data) && !isSpecialDirectReference(data);
 };
 
 /**
@@ -855,12 +869,12 @@ const decayStandardInputReference = state => {
 };
 
 /**
- * Decays an instruction pointer reference if possible
+ * Decays a special reference if possible
  * @param {ProgramState} state The current program state
  * @param {*} data The data which may contain a reference
  * @returns {*}
  */
-const decayInstructionPointerReference = (state, data) => {
+const decaySpecialDirectReference = (state, data) => {
     if (isInstructionPointerReference(data)) {
         return state.ip;
     } else if (isInstructionLocationReference(data)) {
@@ -884,22 +898,29 @@ const decayKnownInstructionPointerReferences = (state, data) => {
     if (isList(data)) {
         let hasSeenDirectReference = false;
         return data.map(datum => {
-            if (isDirectReference(datum) &&
-                !isInstructionPointerReference(datum) &&
-                !isInstructionLocationReference(datum) &&
-                !isStandardInputReference(datum)) {
-                hasSeenDirectReference = true;
-            }
-
             if (!hasSeenDirectReference) {
-                return decayInstructionPointerReference(state, datum);
+                // As long as we have not seen a normal direct reference we can
+                // decay the special direct references
+                if (isSpecialDirectReference(datum)) {
+                    // Decay the special direct reference
+                    return decaySpecialDirectReference(state, datum);
+                } else if (isList(datum) && hasDirectReferences(datum)) {
+                    // Decay special direct references within a list
+                    hasSeenDirectReference =
+                        hasNonSpecialDirectReferences(datum);
+                    return datum.map(item =>
+                        decayKnownInstructionPointerReferences(state, item));
+                } else if (isDirectReference(datum)) {
+                    // A direct reference has been seen
+                    hasSeenDirectReference = true;
+                }
             }
 
             return datum;
         });
     }
 
-    return decayInstructionPointerReference(state, data);
+    return decaySpecialDirectReference(state, data);
 };
 
 /**
@@ -1070,7 +1091,7 @@ export default class Program {
     constructor(
         instructions = [],
         {
-            stdin = () => {},
+            stdin = () => 'UNDEFINED',
             stdout = () => {},
             stderr = () => {},
             onStateChange = () => {}
