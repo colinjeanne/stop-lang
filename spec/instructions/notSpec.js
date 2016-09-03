@@ -11,10 +11,14 @@ describe('The NOT instruction', () => {
         expect(getResult('')).toBe(1);
     });
 
+    it('returns the bitwise inverse of a finite number', () => {
+        expect(getResult('-1')).toBe(0);
+        expect(getResult('0')).toBe(-1);
+        expect(getResult('1')).toBe(-2);
+    });
+
     it('returns the falsey-ness of a single argument', () => {
         expect(getResult('UNDEFINED')).toBe(1);
-        expect(getResult('0')).toBe(1);
-        expect(getResult('1')).toBe(0);
         expect(getResult('NAN')).toBe(1);
         expect(getResult('INFINITY')).toBe(0);
         expect(getResult('[]')).toBe(1);

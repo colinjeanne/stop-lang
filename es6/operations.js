@@ -248,6 +248,24 @@ export const or = (u, v) => {
 };
 
 /**
+ * NOTs a value
+ *
+ * If the LHS is a finite number then the result is the bitwise NOT of the
+ * value where the number is interpreted as a 32-bit signed integer.
+ * Otherwise the result is 1 if either value is falsey and 0 otherwise.
+ *
+ * @param {*} value
+ * @return {*}
+ */
+export const not = value => {
+    if (isNumber(value) && isFinite(value)) {
+        return ~value;
+    }
+
+    return falsey(value);
+};
+
+/**
  * Floors a value numerically
  *
  * If the value is not a numeric value then the result is NAN. Otherwise the

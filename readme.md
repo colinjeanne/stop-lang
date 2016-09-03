@@ -436,8 +436,12 @@ depending on the types of the values. Values are NOTed left to right.
 Providing the command no arguments is equivalent to providing the command with
 a single undefined argument.
 
-If the command is provided a single argument then the result is whether the
-argument is falsey.
+If the command is provided a single finite number then the result is the
+bitwise inverse of the number. The number is interpreted as a 32-bit number in
+two's complement format.
+
+If the command is provided a single argument that is not a finite number then
+the result is whether the argument is falsey.
 
 If the left and right values are lists then the result is the set of elements
 in the left list that do not also exist in the right list.

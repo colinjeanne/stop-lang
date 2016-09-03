@@ -578,7 +578,7 @@ const not = disallowReferences((state, instruction) => {
         const rest = [].concat(...instruction.data.slice(1));
         ret = instruction.data[0].filter(datum => rest.indexOf(datum) === -1);
     } else {
-        ret = Operations.falsey(instruction.data);
+        ret = Operations.not(instruction.data);
     }
 
     return Object.assign(
