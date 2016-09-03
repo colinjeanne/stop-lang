@@ -47,6 +47,9 @@ describe('The WRITE instruction', () => {
 
         expect(getResult('"foo"', stdout)).not.toBeDefined();
         expect(output).toBe('"foo"');
+
+        expect(getResult('"\\"foo\\""', stdout)).not.toBeDefined();
+        expect(output).toBe('"\\"foo\\""');
     });
 
     it('can write lists', () => {

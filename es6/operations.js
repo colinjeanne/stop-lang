@@ -370,7 +370,7 @@ export const asInstructionString = v => {
     if (isUndefined(v)) {
         s = 'UNDEFINED';
     } else if (isString(v)) {
-        s = '"' + v.replace('\\', '\\\\').replace('\"', '\\"') + '"';
+        s = '"' + v.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
     } else if (isNumber(v)) {
         if (Number.isNaN(v)) {
             s = 'NAN';

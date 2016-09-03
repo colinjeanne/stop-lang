@@ -47,6 +47,9 @@ describe('The ERROR instruction', () => {
 
         expect(getResult('"foo"', stderr)).not.toBeDefined();
         expect(output).toBe('"foo"');
+
+        expect(getResult('"\\"foo\\""', stderr)).not.toBeDefined();
+        expect(output).toBe('"\\"foo\\""');
     });
 
     it('can write lists', () => {
